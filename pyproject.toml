@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llama_guard_calibration"
+version = "0.0.1"
+description = "Calibration of Llama Guard 3 on Beavertails Taxonomy"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Giuseppe Magazzù", email = "giuseppe.magazu@gmail.com" }]
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 120
+fix = true
+show-fixes = true
+
+[tool.ruff.lint.isort]
+lines-after-imports = 2
+lines-between-types = 1
+combine-as-imports = true
