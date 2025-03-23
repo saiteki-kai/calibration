@@ -7,9 +7,31 @@ from transformers import GenerationConfig
 
 from datasets import Dataset
 
-from calibration.utils import calibrate_py
 from chat_template import load_chat_template
-from utils import load_model, prepare_input
+from utils import load_model
+
+
+def calibrate_py(p_y, p_cf, mode="diagonal"):
+    num_classes = p_y.shape[0]
+    if p_cf is None:
+        # do not calibrate
+        W = np.identity(num_classes)
+        b = np.zeros([num_classes, 1])
+    else:
+        # calibrate
+        if mode == "diagonal":
+            W = np.linalg.inv(np.identity(num_classes) * p_cf)
+            b = np.zeros([num_classes, 1])
+            cal_py = np.matmul(W, np.expand_dims(p_y, axis=-1)) + b
+        elif mode == "identity":
+            W = np.identity(num_classes)
+            b = -1 * np.expand_dims(np.log(p_cf), axis=-1)
+            cal_py = np.matmul(W, np.expand_dims(np.log(p_y + 10e-6), axis=-1)) + b
+            cal_py = np.exp(cal_py)
+
+    cal_py = cal_py / np.sum(cal_py)
+
+    return cal_py
 
 
 class GuardModel:
@@ -20,15 +42,32 @@ class GuardModel:
         self.model = torch.compile(self.model, fullgraph=True)
         self.model.eval()
 
+    def predict(
+        self,
+        dataset: Dataset,
+        max_length: int = 2048,
+        max_new_tokens: int = 10,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Get uncalibrated predictions for a batch of examples"""
+        dataset = dataset.map(partial(self._predict, max_length=max_length, max_new_tokens=max_new_tokens))
+        dataset = cast(Dataset, dataset)
+
+        probs = np.array(dataset["unsafe_prob"])
+        labels = np.array(dataset["gt_label"])
+        pred_labels = np.array(dataset["pred_label"])
+        pred_probs = np.array(dataset["pred_probs"])
+
+        return probs, labels, pred_labels, pred_probs
+
     @torch.inference_mode()
     def _generate(
         self,
-        example: dict[str, Any],
+        text: str,
         max_length: int = 1024,
         max_new_tokens: int = 10,
     ) -> tuple[torch.Tensor, torch.Tensor, int]:
         # Prepare inputs
-        inputs = self.tokenizer(example["text"], truncation=True, max_length=max_length, return_tensors="pt")
+        inputs = self.tokenizer(text, truncation=True, max_length=max_length, return_tensors="pt")
         inputs = inputs.to(self.model.device)
 
         # Configure generation parameters
@@ -89,34 +128,24 @@ class GuardModel:
 
         return prob, pred_label, label_probs
 
-    def predict(self, data: Dict[str, Any], max_length: int = 2048, max_new_tokens: int = 10) -> Dict[str, Any]:
+    def _prepare_input(self, example: dict[str, Any]) -> str:
+        """Prepare input for the model by applying chat template."""
+        chat = [{"role": "user", "content": example["prompt"]}, {"role": "assistant", "content": example["response"]}]
+
+        return str(self.tokenizer.apply_chat_template(chat, tokenize=False))
+
+    def _predict(self, data: Dict[str, Any], max_length: int = 2048, max_new_tokens: int = 10) -> Dict[str, Any]:
         """Get uncalibrated prediction for a single example"""
-        prompt = prepare_input(data, self.tokenizer)
+        prompt = self._prepare_input(data)
 
         # Generate logits
         outputs = self._generate(prompt, max_length, max_new_tokens)
 
         # Get label predictions
+        gt_label = int(data["is_safe"] is False)
         prob, pred_label, pred_probs = self._get_label_predictions(outputs)
 
-        return {"unsafe_prob": prob, "pred_label": pred_label, "pred_probs": pred_probs}
-
-    def predict_batch(
-        self,
-        dataset: Dataset,
-        max_length: int = 2048,
-        max_new_tokens: int = 10,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """Get uncalibrated predictions for a batch of examples"""
-        dataset = dataset.map(partial(self.predict, max_length=max_length, max_new_tokens=max_new_tokens))
-        dataset = cast(Dataset, dataset)
-
-        probs = np.array(dataset["unsafe_prob"])
-        labels = np.array(dataset["gt_label"])
-        pred_labels = np.array(dataset["pred_label"])
-        pred_probs = np.array(dataset["pred_probs"])
-
-        return probs, labels, pred_labels, pred_probs
+        return {"unsafe_prob": prob, "pred_label": pred_label, "pred_probs": pred_probs, "gt_label": gt_label}
 
 
 class BaseCalibrator:
@@ -132,11 +161,11 @@ class BaseCalibrator:
 
 class ContextFreeCalibrator(BaseCalibrator):
     def calibrate(
-        self, probs: np.ndarray, labels: np.ndarray, pred_labels: np.ndarray, pred_probs: np.ndarray
+        self, probs: np.ndarray, labels: np.ndarray, pred_labels: np.ndarray
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         # Get context-free probability
-        data_cf = {"prompt": "N/A", "response": "N/A", "gt_label": 0, "is_safe": True}
-        prob_cf = self.guard_model.predict(data_cf)
+        data_cf = {"prompt": " ", "response": " ", "gt_label": 0, "is_safe": True}
+        prob_cf = self.guard_model._predict(data_cf)["unsafe_prob"]
         prob_cf = np.array([prob_cf, 1 - prob_cf])
 
         # Calibrate predictions
@@ -150,7 +179,7 @@ class ContextFreeCalibrator(BaseCalibrator):
             pred_lbl = int(np.argmin(cal_prob.reshape(-1)))
             calibrated_pred_labels.append(pred_lbl)
 
-        return np.array(calibrated_probs), labels, np.array(calibrated_pred_labels), pred_probs
+        return np.array(calibrated_probs), labels, np.array(calibrated_pred_labels)
 
 
 class BatchCalibrator(BaseCalibrator):
@@ -174,30 +203,24 @@ class BatchCalibrator(BaseCalibrator):
         return np.array(calibrated_probs), labels, np.array(calibrated_pred_labels), pred_probs
 
 
-class OriginalCalibrator(BaseCalibrator):
-    def calibrate(
-        self, probs: np.ndarray, labels: np.ndarray, pred_labels: np.ndarray, pred_probs: np.ndarray
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        # No calibration, just return original predictions
-        return probs, labels, pred_labels, pred_probs
 
 
 class GuardModelCalibrator:
-    def __init__(self, guard_model: GuardModel, eval_dataset: Dataset, test_dataset: Dataset, method: str):
+    def __init__(self, guard_model: GuardModel, dataset: Dataset, method: str):
         self.guard_model = guard_model
-        self.eval_dataset = eval_dataset
-        self.test_dataset = test_dataset
+        self.dataset = dataset
 
         # Initialize appropriate calibrator
-        calibrators = {"context-free": ContextFreeCalibrator, "batch": BatchCalibrator, "original": OriginalCalibrator}
+        calibrators = {"context-free": ContextFreeCalibrator, "batch": BatchCalibrator}
 
         if method not in calibrators:
             raise ValueError(f"Unknown calibration method: {method}")
 
         self.calibrator = calibrators[method](guard_model)
 
+    def calibrate(self):
         # Get uncalibrated predictions
-        self.probs, self.labels, self.pred_labels, self.pred_probs = self.guard_model.predict_batch(self.test_dataset)
+        self.probs, self.labels, self.pred_labels, self.pred_probs = self.guard_model.predict(self.dataset)
 
         # Apply calibration
         self.calibrated_probs, self.calibrated_labels, self.calibrated_pred_labels, self.calibrated_pred_probs = (
@@ -243,23 +266,17 @@ class GuardModelCalibrator:
 
 
 if __name__ == "__main__":
-    from datasets import DatasetDict, load_dataset
+    from datasets import load_dataset
     from transformers import set_seed
 
     set_seed(42)
 
-    dataset = load_dataset("PKU-Alignment/BeaverTails")
-    dataset = cast(DatasetDict, dataset)
-
-    # Take 10% of 330k_train as eval (calibration set) and 330k_test as test
-    train_dataset = dataset["30k_train"].train_test_split(test_size=0.1, seed=42)
-
-    eval_dataset = train_dataset["test"]
-    test_dataset = dataset["30k_test"]
+    dataset = load_dataset("PKU-Alignment/BeaverTails", split="30k_test")
+    dataset = cast(Dataset, dataset)
 
     # Initialize model and compute predictions once
     guard_model = GuardModel("meta-llama/Llama-Guard-3-1B", "llama-guard-3")
-    probs, labels, pred_labels = guard_model.predict_batch(test_dataset)
+    probs, labels, pred_labels = guard_model.predict(dataset)
 
     # Try different calibration methods using the same predictions
     methods = ["context-free", "batch", "original"]
