@@ -3,18 +3,18 @@ from pathlib import Path
 from typing import cast
 
 import numpy as np
-from sklearn.calibration import CalibrationDisplay
 import torch
 
-from datasets import Dataset
+from datasets import Dataset, load_dataset
 from matplotlib import pyplot as plt
+from sklearn.calibration import CalibrationDisplay
 from sklearn.metrics import auc, brier_score_loss, classification_report, precision_recall_curve
 from transformers import set_seed
 
 import calibration as cal
 
 from chat_template import load_chat_template
-from utils import generate, load_beavertails, load_model
+from utils import generate, load_model
 
 
 if __name__ == "__main__":
@@ -34,7 +34,7 @@ if __name__ == "__main__":
 
     # load and prepare dataset
     print("loading dataset...")
-    dataset = load_beavertails(tokenizer)
+    dataset = load_dataset("PKU-Alignment/BeaverTails", split="330k_test")
     dataset = dataset.select(range(5000))
 
     # predict and evaluate

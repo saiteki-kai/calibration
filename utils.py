@@ -1,7 +1,5 @@
-from functools import partial
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 
-from datasets import Dataset, load_dataset
 from torch import bfloat16, dtype
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedModel
 
@@ -35,19 +33,3 @@ def load_model(
     )
 
     return model, tokenizer
-
-
-def load_beavertails(tokenizer: "Tokenizer") -> Dataset:
-    dataset = load_dataset("PKU-Alignment/BeaverTails", split="330k_test")
-
-    dataset = dataset.map(partial(prepare_input, tokenizer=tokenizer))
-    dataset = dataset.remove_columns(["prompt", "response", "is_safe", "category"])
-
-    return cast(Dataset, dataset)
-
-
-def prepare_input(example: dict[str, Any], tokenizer: "Tokenizer") -> dict[str, Any]:
-    chat = [{"role": "user", "content": example["prompt"]}, {"role": "assistant", "content": example["response"]}]
-    text = str(tokenizer.apply_chat_template(chat, tokenize=False))
-
-    return {"text": text, "gt_label": int(example["is_safe"] is False)}
