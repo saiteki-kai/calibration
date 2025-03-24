@@ -1,14 +1,13 @@
-from typing import Literal
-
 import numpy as np
+import numpy.typing as npt
 
-from .calibrators.context_free import ContextFreeCalibrator
 from .calibrators.batch import BatchCalibrator
+from .calibrators.context_free import ContextFreeCalibrator
 from .models.guard_model import GuardModel
 
 
 class GuardModelCalibrator:
-    def __init__(self, guard_model: GuardModel, method: Literal["context-free", "batch"]):
+    def __init__(self, guard_model: GuardModel, method: str):
         self.guard_model = guard_model
         self.method = method
 
@@ -56,7 +55,7 @@ class GuardModelCalibrator:
 
         return self._format_results(calibrated_probs, calibrated_pred_labels)
 
-    def calibrate_predictions(self, probs, pred_labels):
+    def calibrate_predictions(self, probs: npt.NDArray[np.float64], pred_labels: npt.NDArray[np.int64]):
         return self.calibrator.calibrate(probs, pred_labels)
 
     def compute_prior(self, precomputed_probs=None):
