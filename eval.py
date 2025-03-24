@@ -1,70 +1,54 @@
-from functools import partial
-from pathlib import Path
-from typing import cast
-
 import numpy as np
-import torch
-
-from datasets import Dataset, load_dataset
-from matplotlib import pyplot as plt
-from sklearn.calibration import CalibrationDisplay
-from sklearn.metrics import auc, brier_score_loss, classification_report, precision_recall_curve
+from datasets import load_dataset
 from transformers import set_seed
 
-import calibration as cal
+from src.guard_calibrator.calibrator import GuardModelCalibrator
+from src.guard_calibrator.models.guard_model import GuardModel
+from src.visualization.plotting import plot_calibration_curves
+from src.metrics.calibration_metrics import compute_metrics
 
-from chat_template import load_chat_template
-from utils import generate, load_model
+
+def main():
+    # Set random seed for reproducibility
+    ece_bins = 15
+    set_seed(42)
+
+    # Load dataset
+    dataset = load_dataset("PKU-Alignment/BeaverTails", split="330k_test")
+    dataset = dataset.select(range(2000))  # Use a small subset for testing
+
+    # Initialize model and calibrator
+    guard_model = GuardModel("meta-llama/Llama-Guard-3-1B", "llama-guard-3")
+
+    # Get uncalibrated predictions first
+    pred_labels, label_probs = guard_model.predict(dataset)
+    true_labels = np.asarray([0 if x["is_safe"] else 1 for x in dataset])
+
+    # Compute metrics for uncalibrated results
+    print("Uncalibrated:")
+    compute_metrics(true_labels, label_probs, pred_labels, ece_bins=ece_bins)
+
+    methods = ["batch", "context-free"]
+    cal_results = []
+
+    for method in methods:
+        print(f"\nMethod: {method}")
+
+        # Initialize calibrator
+        calibrator = GuardModelCalibrator(guard_model, method=method)
+
+        # Calibrate predictions using pre-computed probabilities
+        print("Calibrating predictions...")
+        cal_probs, cal_pred_labels = calibrator.calibrate_predictions(label_probs, pred_labels)
+        cal_results.append((method, cal_probs))
+
+        # Compute metrics for calibrated results
+        print(f"\nCalibrated ({method}):")
+        compute_metrics(true_labels, cal_probs, cal_pred_labels, ece_bins=ece_bins)
+
+    # Plot all calibration curves in a single figure
+    plot_calibration_curves(true_labels, label_probs, cal_results)
 
 
 if __name__ == "__main__":
-    set_seed(42)
-
-    calibration_method = "origin"
-    model_name = "meta-llama/Llama-Guard-3-1B"
-    taxonomy = "llama-guard-3"
-    # taxonomy = "beavertails"
-
-    # load model and tokenizer
-    model, tokenizer = load_model(model_name)
-    tokenizer.chat_template = load_chat_template(taxonomy, descriptions=True)
-
-    model = torch.compile(model, fullgraph=True)
-    model.eval()
-
-    # load and prepare dataset
-    print("loading dataset...")
-    dataset = load_dataset("PKU-Alignment/BeaverTails", split="330k_test")
-    dataset = dataset.select(range(5000))
-
-    # predict and evaluate
-    # compute_predictions(model, dataset)
-    tmp_filepath = Path(f"{calibration_method}.jsonl")
-
-    if not tmp_filepath.exists():
-        results = dataset.map(partial(generate, model=model, tokenizer=tokenizer, max_length=2048, max_new_tokens=10))
-        results = results.remove_columns(["text"])
-        results.to_json(tmp_filepath)
-    else:
-        results = cast(Dataset, Dataset.from_json(str(tmp_filepath)))
-
-    results = cast(dict, results.to_dict())
-
-    model_probs = np.array(results["unsafe_prob"])
-    labels = np.array(results["gt_label"])
-    pred_labels = np.array(results["pred_label"])
-
-    print(f"ECE: {cal.utils.get_calibration_error(model_probs, labels, debias=False)}")
-    print(f"Brier: {brier_score_loss(labels, model_probs)}")
-
-    precision, recall, _ = precision_recall_curve(labels, model_probs)
-    print("AUPRC: ", auc(recall, precision))
-
-    print(classification_report(labels, pred_labels))
-
-    fig = plt.figure(figsize=(4, 4))
-    # x, y = calibration_curve(labels, model_probs)
-    CalibrationDisplay.from_predictions(labels, model_probs, n_bins=20, ax=fig.add_subplot(1, 1, 1))
-    # sns.lineplot(x=x, y=y)
-    plt.tight_layout()
-    plt.show()
+    main()
