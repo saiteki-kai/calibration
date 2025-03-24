@@ -38,14 +38,13 @@ class GuardModel:
     def predict(
         self,
         data: dict[str, str] | list[dict[str, str]] | Dataset,
-        max_length: int = 2048,
         max_new_tokens: int = 10,
     ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.int64]]:
         if isinstance(data, list) or isinstance(data, Dataset):
             results = []
 
             for example in tqdm(data, desc="Computing predictions"):
-                result = self._predict(example, max_length, max_new_tokens)
+                result = self._predict(example, max_new_tokens)
                 results.append(result)
 
             pred_labels, label_probs = zip(*results)
@@ -55,14 +54,9 @@ class GuardModel:
             return pred_labels, label_probs
 
         else:
-            return self._predict(data, max_length, max_new_tokens)
+            return self._predict(data, max_new_tokens)
 
-    def _generate(
-        self,
-        text: str,
-        max_length: int = 1024,
-        max_new_tokens: int = 10,
-    ) -> tuple[torch.Tensor, torch.Tensor, int]:
+    def _generate(self, text: str, max_new_tokens: int = 10) -> tuple[torch.Tensor, torch.Tensor, int]:
         inputs = self.tokenizer(text, return_tensors="pt")
 
         # Configure generation parameters
@@ -123,10 +117,8 @@ class GuardModel:
 
         return str(self.tokenizer.apply_chat_template(chat, tokenize=False))
 
-    def _predict(
-        self, data: dict[str, object], max_length: int = 2048, max_new_tokens: int = 10
-    ) -> tuple[int, npt.NDArray[np.float64]]:
+    def _predict(self, data: dict[str, object], max_new_tokens: int = 10) -> tuple[int, npt.NDArray[np.float64]]:
         prompt = self._prepare_input(data)
-        outputs = self._generate(prompt, max_length, max_new_tokens)
+        outputs = self._generate(prompt, max_new_tokens)
 
         return self._get_label_predictions(outputs)
