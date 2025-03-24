@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Tuple, Literal
+from typing import Literal
 
 import numpy as np
 import numpy.typing as npt
@@ -14,16 +14,17 @@ class BaseCalibrator(ABC):
 
     @abstractmethod
     def compute_prior(self, probs: npt.NDArray[np.float64] | None = None) -> npt.NDArray[np.float64]:
-        raise NotImplementedError
+        raise NotImplementedError("Subclasses must implement compute_prior method")
 
+    @abstractmethod
     def get_calibration_mode(self) -> Literal["diagonal", "identity"]:
-        return "diagonal"
+        raise NotImplementedError("Subclasses must implement get_calibration_mode method")
 
     def calibrate(
         self,
         pred_probs: npt.NDArray[np.float64],
         pred_labels: npt.NDArray[np.int64],
-    ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.int64]]:
+    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.int64]]:
         prior = self.compute_prior(pred_probs)
         mode = self.get_calibration_mode()
 
@@ -47,5 +48,5 @@ class BaseCalibrator(ABC):
         labels: npt.NDArray[np.int64],
         pred_labels: npt.NDArray[np.int64],
         pred_probs: npt.NDArray[np.float64],
-    ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.int64], npt.NDArray[np.float64]]:
+    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.int64], npt.NDArray[np.float64]]:
         return self.calibrate(probs, pred_labels)

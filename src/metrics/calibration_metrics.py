@@ -1,3 +1,5 @@
+import numpy as np
+import numpy.typing as npt
 from netcal.metrics import ECE, MCE
 from sklearn.metrics import (
     auc,
@@ -11,7 +13,12 @@ from sklearn.metrics import (
 )
 
 
-def compute_metrics(true_labels, probs, pred_labels, ece_bins=15):
+def compute_metrics(
+    true_labels: npt.NDArray[np.int64],
+    probs: npt.NDArray[np.float64],
+    pred_labels: npt.NDArray[np.int64],
+    ece_bins: int = 15
+) -> dict[str, float]:
     # Create ECE calculator inside the function
     ece_calculator = ECE(bins=ece_bins)
     mce_calculator = MCE(bins=ece_bins)

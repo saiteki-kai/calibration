@@ -1,5 +1,6 @@
 import numpy as np
 import numpy.typing as npt
+from typing import Literal
 
 from .base import BaseCalibrator
 
@@ -11,5 +12,5 @@ class BatchCalibrator(BaseCalibrator):
 
         return np.mean(probs, axis=0)
 
-    def get_calibration_mode(self) -> str:
+    def get_calibration_mode(self) -> Literal["diagonal", "identity"]:
         return "identity"

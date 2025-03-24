@@ -1,6 +1,4 @@
-"""Guard model for safety classification."""
-
-from typing import Any, cast
+from typing import cast
 
 import numpy as np
 import numpy.typing as npt
@@ -30,6 +28,7 @@ class GuardModel:
         # self.model = torch.compile(self.model, mode="reduce-overhead", fullgraph=True)
 
         self.tokenizer.chat_template = load_chat_template(taxonomy, descriptions)
+        self.label_token_ids = [self.tokenizer.encode(label, add_special_tokens=False)[0] for label in labels]
 
         self.labels = labels
         self.pos_label = pos_label
@@ -101,22 +100,22 @@ class GuardModel:
     def _get_label_predictions(self, outputs: tuple[torch.Tensor, torch.Tensor, int]) -> tuple[int, torch.Tensor]:
         logits, sequences, prompt_len = outputs
 
-        label_token_ids = [self.tokenizer.encode(lbl, add_special_tokens=False)[0] for lbl in self.labels]
-        label_text = self.tokenizer.decode(sequences[0][prompt_len + self.label_token_pos])
+        label_token_id = sequences[0][prompt_len + self.label_token_pos]
+        label_text = self.tokenizer.decode(label_token_id)
         label_text = label_text.strip().lower()
 
         if label_text not in self.labels:
-            raise ValueError(f"Label {label_text} not in {self.labels}")
+            raise ValueError(f"Predicted label '{label_text}' not in allowed labels: {self.labels}")
 
         pred_label = self.labels.index(label_text)
 
         # Get logits and probabilities for both classes
-        label_logits = tuple(logits)[self.label_token_pos][0][label_token_ids]
+        label_logits = tuple(logits)[self.label_token_pos][0][self.label_token_ids]
         label_probs = torch.softmax(label_logits, dim=-1)
 
         return pred_label, label_probs.detach().cpu().numpy()
 
-    def _prepare_input(self, example: dict[str, Any]) -> str:
+    def _prepare_input(self, example: dict[str, object]) -> str:
         chat = [
             {"role": "user", "content": example["prompt"]},
             {"role": "assistant", "content": example["response"]},
@@ -124,8 +123,10 @@ class GuardModel:
 
         return str(self.tokenizer.apply_chat_template(chat, tokenize=False))
 
-    def _predict(self, data: dict[str, Any], max_length: int = 2048, max_new_tokens: int = 10) -> tuple[int, npt.NDArray[np.float64]]:
+    def _predict(
+        self, data: dict[str, object], max_length: int = 2048, max_new_tokens: int = 10
+    ) -> tuple[int, npt.NDArray[np.float64]]:
         prompt = self._prepare_input(data)
         outputs = self._generate(prompt, max_length, max_new_tokens)
-    
+
         return self._get_label_predictions(outputs)

@@ -1,5 +1,3 @@
-"""Main calibrator class."""
-
 from typing import Literal
 
 import numpy as np
@@ -15,7 +13,6 @@ class GuardModelCalibrator:
     def __init__(self, guard_model: GuardModel, method: Literal["context-free", "batch"]):
         self.guard_model = guard_model
 
-        # Initialize the appropriate calibrator based on method
         if method == "context-free":
             self.calibrator = ContextFreeCalibrator(guard_model)
         elif method == "batch":
@@ -27,7 +24,6 @@ class GuardModelCalibrator:
         self,
         data: dict[str, str] | list[dict[str, str]] | Dataset,
     ) -> dict[str, float | int] | list[dict[str, float | int]] | tuple[npt.NDArray[np.float64], npt.NDArray[np.int64]]:
-        """Get raw predictions from the guard model."""
         return self.guard_model.predict(data)
 
     def calibrate(

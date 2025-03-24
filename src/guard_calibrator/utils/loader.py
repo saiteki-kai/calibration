@@ -1,13 +1,8 @@
-from typing import TYPE_CHECKING
-
 from torch import bfloat16, dtype
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedModel
+from transformers import PreTrainedTokenizer, PreTrainedTokenizerFast
 
-
-if TYPE_CHECKING:
-    from transformers import PreTrainedTokenizer, PreTrainedTokenizerFast
-
-    Tokenizer = PreTrainedTokenizer | PreTrainedTokenizerFast
+Tokenizer = PreTrainedTokenizer | PreTrainedTokenizerFast
 
 
 def load_model(
@@ -16,7 +11,7 @@ def load_model(
     torch_dtype: dtype = bfloat16,
     trust_remote_code: bool = True,
     device_map: str = "cuda",
-) -> tuple[PreTrainedModel, "Tokenizer"]:
+) -> tuple[PreTrainedModel, Tokenizer]:
     if tokenizer_name is None:
         tokenizer_name = model_name
 

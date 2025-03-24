@@ -1,9 +1,16 @@
 import matplotlib.pyplot as plt
+import numpy as np
+import numpy.typing as npt
 import seaborn as sns
 from sklearn.calibration import calibration_curve
 
 
-def plot_calibration_curves(true_labels, label_probs, cal_results, n_bins=20):
+def plot_calibration_curves(
+    true_labels: npt.NDArray[np.int64],
+    label_probs: npt.NDArray[np.float64],
+    cal_results: list[tuple[str, npt.NDArray[np.float64]]],
+    n_bins: int = 20,
+) -> None:
     sns.set_style("white")
     sns.set_context("paper", font_scale=2)
 
