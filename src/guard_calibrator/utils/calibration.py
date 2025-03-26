@@ -4,12 +4,9 @@ import numpy.typing as npt
 
 def calibrate_py(
     p_y: npt.NDArray[np.float64],
-    p_cf: npt.NDArray[np.float64] | None,
+    p_cf: npt.NDArray[np.float64],
     mode: str = "diagonal",
 ) -> npt.NDArray[np.float64]:
-    if p_cf is None:
-        return p_y
-
     if mode not in ["diagonal", "identity"]:
         msg = f"Invalid calibration mode: {mode}. Must be one of: ['diagonal', 'identity']"
         raise ValueError(msg)
