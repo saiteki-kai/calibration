@@ -74,7 +74,7 @@ def main(args: argparse.Namespace) -> None:
 
         # Calibrate predictions using pre-computed probabilities
         cal_probs, cal_pred_labels = calibrator.calibrate(label_probs, pred_labels)
-        calibrated_results.append((method, cal_probs))
+        calibrated_results.append((method, cal_probs, cal_pred_labels))
 
         # Compute metrics for calibrated results
         metrics[method] = compute_metrics(
@@ -90,6 +90,12 @@ def main(args: argparse.Namespace) -> None:
     # Save metrics
     with (output_path / "metrics.json").open("w") as f:
         json.dump(metrics, f)
+
+    # Save calibrated results
+    calibrated_predictions = Dataset.from_dict(
+        dict(zip(["method", "calibrated_probs", "calibrated_labels"], zip(*calibrated_results)))
+    )
+    calibrated_predictions.to_json(output_path / "calibrated_predictions.json")
 
     # Plot all calibration curves in a single figure
     plot_calibration_curves(

@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 def plot_calibration_curves(
     true_labels: "NDArray[int64]",
     label_probs: "NDArray[float64]",
-    cal_results: list[tuple[str, "NDArray[float64]"]],
+    cal_results: list[tuple[str, "NDArray[float64]", "NDArray[float64]"]],
     n_bins: int = 20,
     output_path: Path | str | None = None,
     show_plot: bool = True,
@@ -37,7 +37,7 @@ def plot_calibration_curves(
     # Calibrated model lines
     colors = sns.color_palette("husl", len(cal_results))
 
-    for (method_name, cal_probs), color in zip(cal_results, colors):
+    for (method_name, cal_probs, _cal_pred_labels), color in zip(cal_results, colors):
         prob_true, prob_pred = calibration_curve(true_labels, cal_probs[:, 1], n_bins=n_bins)
 
         sns.lineplot(
