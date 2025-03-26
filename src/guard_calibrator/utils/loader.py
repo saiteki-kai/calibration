@@ -1,6 +1,12 @@
 from torch import bfloat16, dtype
-from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedModel
-from transformers import PreTrainedTokenizer, PreTrainedTokenizerFast
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    PreTrainedModel,
+    PreTrainedTokenizer,
+    PreTrainedTokenizerFast,
+)
+
 
 Tokenizer = PreTrainedTokenizer | PreTrainedTokenizerFast
 

@@ -1,18 +1,22 @@
+import logging
+
 from typing import cast
+
 import numpy as np
 import numpy.typing as npt
+
 from netcal.metrics import ECE, MCE
-import logging
 from sklearn.metrics import (
+    accuracy_score,
     auc,
     brier_score_loss,
     classification_report,
+    f1_score,
     precision_recall_curve,
     precision_score,
     recall_score,
-    accuracy_score,
-    f1_score,
 )
+
 
 logger = logging.getLogger(__name__)
 

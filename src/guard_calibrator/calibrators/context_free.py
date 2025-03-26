@@ -1,8 +1,10 @@
+from typing import Any
+
 import numpy as np
 import numpy.typing as npt
-from typing import Any
-from .base import BaseCalibrator
+
 from ..models.guard_model import GuardModel
+from .base import BaseCalibrator
 
 
 class ContextFreeCalibrator(BaseCalibrator):
