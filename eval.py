@@ -11,15 +11,14 @@ from src.metrics.calibration_metrics import compute_metrics
 from src.visualization.plotting import plot_calibration_curves
 
 
-def main():
+def main() -> None:
     # Set random seed for reproducibility
     ece_bins = 15
     set_seed(42)
 
     # Load dataset
     dataset = load_dataset("PKU-Alignment/BeaverTails", split="330k_test")
-    dataset = cast(Dataset, dataset)
-    # dataset = dataset.select(range(2000))  # Use a small subset for testing
+    dataset = cast("Dataset", dataset)
 
     # Initialize model
     guard_model = GuardModel("meta-llama/Llama-Guard-3-1B", "beavertails", descriptions=False)
@@ -38,7 +37,7 @@ def main():
             "label_probs": label_probs,
             "pred_labels": pred_labels,
             "true_labels": true_labels,
-        }
+        },
     )
     uncalibrated_results.to_json("uncalibrated_results.json")
 

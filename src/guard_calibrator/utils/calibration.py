@@ -11,7 +11,8 @@ def calibrate_py(
         return p_y
 
     if mode not in ["diagonal", "identity"]:
-        raise ValueError(f"Invalid calibration mode: {mode}. Must be one of: ['diagonal', 'identity']")
+        msg = f"Invalid calibration mode: {mode}. Must be one of: ['diagonal', 'identity']"
+        raise ValueError(msg)
 
     num_classes = p_y.shape[0]
 

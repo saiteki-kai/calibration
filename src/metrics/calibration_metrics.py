@@ -33,8 +33,8 @@ def compute_metrics(
     mce_calculator = MCE(bins=ece_bins)
 
     # Calculate calibration metrics
-    ece_score = cast(float, ece_calculator.measure(probs, true_labels))
-    mce_score = cast(float, mce_calculator.measure(probs, true_labels))
+    ece_score = cast("float", ece_calculator.measure(probs, true_labels))
+    mce_score = cast("float", mce_calculator.measure(probs, true_labels))
     brier_score = brier_score_loss(true_labels, pred_labels)
 
     # Calculate classification metrics
@@ -48,14 +48,14 @@ def compute_metrics(
     auprc = auc(pr_recall, pr_precision)
 
     if verbose:
-        logger.info(f"ECE: {ece_score}")
-        logger.info(f"MCE: {mce_score}")
-        logger.info(f"Brier: {brier_score}")
-        logger.info(f"F1: {f1}")
-        logger.info(f"Precision: {precision}")
-        logger.info(f"Recall: {recall}")
-        logger.info(f"Accuracy: {accuracy}")
-        logger.info(f"AUPRC: {auprc}")
+        logger.info("ECE: %s", ece_score)
+        logger.info("MCE: %s", mce_score)
+        logger.info("Brier: %s", brier_score)
+        logger.info("F1: %s", f1)
+        logger.info("Precision: %s", precision)
+        logger.info("Recall: %s", recall)
+        logger.info("Accuracy: %s", accuracy)
+        logger.info("AUPRC: %s", auprc)
         logger.info("\nClassification Report:")
         logger.info(classification_report(true_labels, pred_labels))
 

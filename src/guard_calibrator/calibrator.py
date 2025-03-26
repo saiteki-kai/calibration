@@ -1,63 +1,58 @@
+from typing import TYPE_CHECKING, Any
+
 import numpy as np
 import numpy.typing as npt
 
-from .calibrators.base import BaseCalibrator
-from .calibrators.batch import BatchCalibrator
-from .calibrators.context_free import ContextFreeCalibrator
-from .models.guard_model import GuardModel
+from src.guard_calibrator.calibrators.batch import BatchCalibrator
+from src.guard_calibrator.calibrators.context_free import ContextFreeCalibrator
+from src.guard_calibrator.models.guard_model import GuardModel
+
+
+if TYPE_CHECKING:
+    from src.guard_calibrator.calibrators.base import BaseCalibrator
 
 
 class GuardModelCalibrator:
-    def __init__(self, guard_model: GuardModel, method: str):
+    def __init__(self, guard_model: GuardModel, method: str) -> None:
         self.guard_model = guard_model
         self.method = method
 
-        calibrators: dict[str, type[BaseCalibrator]] = {
+        calibrators: dict[str, type["BaseCalibrator"]] = {
             "context-free": ContextFreeCalibrator,
             "batch": BatchCalibrator,
         }
 
         if method not in calibrators:
-            raise ValueError(f"Unknown calibration method: {method}. Available methods: {list(calibrators.keys())}")
+            msg = f"Unknown calibration method: {method}. Available methods: {list(calibrators.keys())}"
+            raise ValueError(msg)
 
         self.calibrator = calibrators[method](guard_model)
 
-    def predict(self, data):
-        return self.guard_model.predict(data)
-
-    def _format_predictions(self, preds):
-        if isinstance(preds, tuple):
-            probs, pred_labels = preds
-        elif isinstance(preds, dict):
-            probs = preds["label_probs"].cpu().numpy()
-            pred_labels = np.array([preds["pred_label"]])
-        else:
-            probs = np.array([p["label_probs"].cpu().numpy() for p in preds])
-            pred_labels = np.array([p["pred_label"] for p in preds])
-
-        return probs, pred_labels
-
-    def _format_results(self, calibrated_probs, calibrated_pred_labels):
-        results = []
-        for i in range(len(calibrated_probs)):
-            results.append(
-                {
-                    "label_probs": calibrated_probs[i],
-                    "pred_label": int(calibrated_pred_labels[i]),
-                }
-            )
-
-        return results[0] if len(results) == 1 else results
-
-    def predict_and_calibrate(self, data):
-        preds = self.predict(data)
-        probs, pred_labels = self._format_predictions(preds)
-        calibrated_probs, calibrated_pred_labels = self.calibrator.calibrate(probs, pred_labels)
+    def predict_and_calibrate(self, data: list[dict[str, str]]) -> list[dict[str, Any]]:
+        pred_labels, pred_probs = self.guard_model.predict(data)
+        calibrated_probs, calibrated_pred_labels = self.calibrator.calibrate(pred_probs, pred_labels)
 
         return self._format_results(calibrated_probs, calibrated_pred_labels)
 
-    def calibrate(self, probs: npt.NDArray[np.float64], pred_labels: npt.NDArray[np.int64]):
+    def calibrate(
+        self,
+        probs: npt.NDArray[np.float64],
+        pred_labels: npt.NDArray[np.int64],
+    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.int64]]:
         return self.calibrator.calibrate(probs, pred_labels)
 
-    def compute_prior(self, precomputed_probs=None):
+    def compute_prior(self, precomputed_probs: npt.NDArray[np.float64] | None = None) -> npt.NDArray[np.float64]:
         return self.calibrator.compute_prior(precomputed_probs)
+
+    def _format_results(
+        self,
+        calibrated_probs: npt.NDArray[np.float64],
+        calibrated_pred_labels: npt.NDArray[np.int64],
+    ) -> list[dict[str, Any]]:
+        return [
+            {
+                "label_probs": calibrated_probs[i],
+                "pred_label": int(calibrated_pred_labels[i]),
+            }
+            for i in range(len(calibrated_probs))
+        ]

@@ -1,4 +1,4 @@
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -6,7 +6,10 @@ import torch
 
 from tqdm import tqdm
 from transformers import GenerationConfig
-from transformers.generation import GenerateDecoderOnlyOutput
+
+
+if TYPE_CHECKING:
+    from transformers.generation import GenerateDecoderOnlyOutput
 
 from src.guard_calibrator.utils.chat_template import load_chat_template
 from src.guard_calibrator.utils.loader import load_model
@@ -21,10 +24,9 @@ class GuardModel:
         pos_label: str = "unsafe",
         label_token_pos: int = 1,
         descriptions: bool = True,
-    ):
+    ) -> None:
         self.model, self.tokenizer = load_model(model_name)
         self.model.eval()
-        # self.model = torch.compile(self.model, mode="reduce-overhead", fullgraph=True)
 
         self.tokenizer.chat_template = load_chat_template(taxonomy, descriptions)
         self.label_token_ids = [self.tokenizer.encode(label, add_special_tokens=False)[0] for label in labels]
@@ -66,10 +68,11 @@ class GuardModel:
 
         # Generate outputs
         outputs = self.model.generate(**inputs, generation_config=self.generation_config)
-        outputs = cast(GenerateDecoderOnlyOutput, outputs)
+        outputs = cast("GenerateDecoderOnlyOutput", outputs)
 
         if outputs.logits is None:
-            raise ValueError("GenerationConfig.output_logits must be True to use this function.")
+            msg = "GenerationConfig.output_logits must be True to use this function."
+            raise ValueError(msg)
 
         return outputs.logits, outputs.sequences, inputs["input_ids"].shape[-1]
 
@@ -94,7 +97,8 @@ class GuardModel:
         return config
 
     def _get_label_predictions(
-        self, outputs: tuple[tuple[torch.Tensor], torch.Tensor, int]
+        self,
+        outputs: tuple[tuple[torch.Tensor], torch.Tensor, int],
     ) -> tuple[int, npt.NDArray[np.float64]]:
         logits, sequences, prompt_len = outputs
 
@@ -103,7 +107,8 @@ class GuardModel:
         label_text = label_text.strip().lower()
 
         if label_text not in self.labels:
-            raise ValueError(f"Predicted label '{label_text}' not in allowed labels: {self.labels}")
+            msg = f"Predicted label '{label_text}' not in allowed labels: {self.labels}"
+            raise ValueError(msg)
 
         pred_label = self.labels.index(label_text)
 

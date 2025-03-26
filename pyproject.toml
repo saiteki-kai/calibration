@@ -17,7 +17,39 @@ fix = true
 show-fixes = true
 
 [tool.ruff.lint]
-select = ["I"]
+select = [
+    "ERA",
+    "ANN",
+    "S",
+    "A",
+    "C4",
+    "EM",
+    "ICN",
+    "LOG",
+    "G",
+    "INP",
+    "PIE",
+    "PYI",
+    "Q",
+    "RET",
+    "SLF",
+    "SIM",
+    "TID",
+    "TC",
+    "I",
+    "ARG",
+    "PTH",
+    "NPY",
+    "PD",
+    "N",
+    "PERF",
+    "E",
+    "W",
+    "F",
+    "RUF",
+    "TRY",
+]
+ignore = ["N806"]
 
 [tool.ruff.lint.isort]
 lines-after-imports = 2
