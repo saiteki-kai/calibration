@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,6 +9,10 @@ import seaborn as sns
 from sklearn.calibration import calibration_curve
 
 
+if TYPE_CHECKING:
+    from matplotlib.figure import Figure
+
+
 def plot_calibration_curves(
     true_labels: npt.NDArray[np.int64],
     label_probs: npt.NDArray[np.float64],
@@ -15,7 +20,7 @@ def plot_calibration_curves(
     n_bins: int = 20,
     output_path: Path | None = None,
     show_plot: bool = True,
-) -> plt.figure.Figure:
+) -> "Figure":
     sns.set_style("white")
     sns.set_context("paper", font_scale=2)
 

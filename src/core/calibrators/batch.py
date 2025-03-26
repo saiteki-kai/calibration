@@ -1,8 +1,8 @@
 import numpy as np
 import numpy.typing as npt
 
-from src.guard_calibrator.calibrators.base import BaseCalibrator
-from src.guard_calibrator.models.guard_model import GuardModel
+from src.core.calibrators.base import BaseCalibrator
+from src.core.classifiers.guard_model import GuardModel
 
 
 class BatchCalibrator(BaseCalibrator):

@@ -3,8 +3,8 @@ from abc import ABC, abstractmethod
 import numpy as np
 import numpy.typing as npt
 
-from src.guard_calibrator.models.guard_model import GuardModel
-from src.guard_calibrator.utils.calibration import calibrate_py
+from src.core.calibrators.calibration import calibrate_py
+from src.core.classifiers.guard_model import GuardModel
 
 
 class BaseCalibrator(ABC):

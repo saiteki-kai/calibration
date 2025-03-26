@@ -3,13 +3,13 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import numpy.typing as npt
 
-from src.guard_calibrator.calibrators.batch import BatchCalibrator
-from src.guard_calibrator.calibrators.context_free import ContextFreeCalibrator
-from src.guard_calibrator.models.guard_model import GuardModel
+from src.core.calibrators.batch import BatchCalibrator
+from src.core.calibrators.context_free import ContextFreeCalibrator
+from src.core.classifiers.guard_model import GuardModel
 
 
 if TYPE_CHECKING:
-    from src.guard_calibrator.calibrators.base import BaseCalibrator
+    from src.core.calibrators.base import BaseCalibrator
 
 
 class GuardModelCalibrator:

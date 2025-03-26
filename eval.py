@@ -5,10 +5,10 @@ import numpy as np
 from datasets import Dataset, load_dataset
 from transformers import set_seed
 
-from src.guard_calibrator.calibrator import GuardModelCalibrator
-from src.guard_calibrator.models.guard_model import GuardModel
-from src.metrics.calibration_metrics import compute_metrics
-from src.visualization.plotting import plot_calibration_curves
+from src.core.calibrator import GuardModelCalibrator
+from src.core.classifiers.guard_model import GuardModel
+from src.evaluation.metrics import compute_metrics
+from src.evaluation.visualization import plot_calibration_curves
 
 
 def main() -> None:

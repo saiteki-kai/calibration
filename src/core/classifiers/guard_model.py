@@ -11,8 +11,8 @@ from transformers import GenerationConfig
 if TYPE_CHECKING:
     from transformers.generation import GenerateDecoderOnlyOutput
 
-from src.guard_calibrator.utils.chat_template import load_chat_template
-from src.guard_calibrator.utils.loader import load_model
+from src.core.classifiers.chat_template import load_chat_template
+from src.core.classifiers.loader import load_model
 
 
 class GuardModel:
