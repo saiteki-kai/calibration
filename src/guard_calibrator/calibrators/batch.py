@@ -4,6 +4,7 @@ import numpy.typing as npt
 from .base import BaseCalibrator
 from ..models.guard_model import GuardModel
 
+
 class BatchCalibrator(BaseCalibrator):
     def __init__(self, guard_model: GuardModel):
         super().__init__(guard_model)

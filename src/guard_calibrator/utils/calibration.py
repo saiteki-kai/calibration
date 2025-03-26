@@ -1,6 +1,7 @@
 import numpy as np
 import numpy.typing as npt
 
+
 def calibrate_py(
     p_y: npt.NDArray[np.float64],
     p_cf: npt.NDArray[np.float64] | None,
