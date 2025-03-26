@@ -18,13 +18,14 @@ def plot_calibration_curves(
     label_probs: npt.NDArray[np.float64],
     cal_results: list[tuple[str, npt.NDArray[np.float64]]],
     n_bins: int = 20,
-    output_path: Path | None = None,
+    output_path: Path | str | None = None,
     show_plot: bool = True,
+    title: str = "Calibration Curves Comparison",
 ) -> "Figure":
-    sns.set_style("white")
-    sns.set_context("paper", font_scale=2)
+    sns.set_style("whitegrid")
+    sns.set_context("paper", font_scale=1.5)
 
-    fig, ax = plt.subplots(figsize=(12, 8), num="Calibration Curves")
+    fig, ax = plt.subplots(figsize=(8, 8), num="Calibration Curves")
 
     # Perfect calibration reference line
     ax.plot([0, 1], [0, 1], linestyle="--", color="gray", alpha=0.5, label="Perfect Calibration")
@@ -50,17 +51,21 @@ def plot_calibration_curves(
             color=color,
         )
 
+    ax.set_title(title)
     ax.set_xlabel("Predicted Probability", labelpad=10)
     ax.set_ylabel("True Probability", labelpad=10)
-    ax.set_title("Calibration Curves Comparison")
+
+    ax.set_aspect("equal")
+    ax.legend(loc="lower right")
 
     plt.tight_layout()
 
     if output_path:
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path = Path(output_path)
+        output_path.mkdir(parents=True, exist_ok=True)
 
-        plt.savefig(output_path.with_suffix(".pdf"), dpi=300, bbox_inches="tight")
-        plt.savefig(output_path.with_suffix(".png"), dpi=300, bbox_inches="tight")
+        plt.savefig(output_path / "calibration_curves.pdf", dpi=300, bbox_inches="tight")
+        plt.savefig(output_path / "calibration_curves.png", dpi=300, bbox_inches="tight")
 
     if show_plot:
         plt.show()

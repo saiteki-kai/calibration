@@ -30,7 +30,7 @@ def load_chat_template(taxonomy: str = "llama-guard-3", descriptions: bool = Fal
     if taxonomy == "beavertails":
         return replace_categories(CHAT_TEMPLATE_LLAMA_GUARD_3, descriptions)
 
-    msg = f"Unknown taxonomy: {taxonomy}"
+    msg = f"Unknown taxonomy: {taxonomy}. Available taxonomies: llama-guard-3, beavertails"
     raise ValueError(msg)
 
 

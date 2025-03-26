@@ -1,8 +1,13 @@
+import logging
+
 import numpy as np
 import numpy.typing as npt
 
 from src.core.calibrators.base import BaseCalibrator
 from src.core.classifiers.guard_model import GuardModel
+
+
+logger = logging.getLogger(__name__)
 
 
 class BatchCalibrator(BaseCalibrator):
@@ -15,4 +20,7 @@ class BatchCalibrator(BaseCalibrator):
             msg = "Batch calibration requires pre-computed probabilities"
             raise ValueError(msg)
 
-        return np.mean(probs, axis=0)
+        avg_probs = np.mean(probs, axis=0)
+        logger.info("Prior probability: %s", avg_probs)
+
+        return avg_probs

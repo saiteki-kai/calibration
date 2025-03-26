@@ -1,4 +1,4 @@
-import warnings
+import logging
 
 from typing import Any
 
@@ -7,6 +7,9 @@ import numpy.typing as npt
 
 from src.core.calibrators.base import BaseCalibrator
 from src.core.classifiers.guard_model import GuardModel
+
+
+logger = logging.getLogger(__name__)
 
 
 class ContextFreeCalibrator(BaseCalibrator):
@@ -23,10 +26,11 @@ class ContextFreeCalibrator(BaseCalibrator):
 
     def compute_prior(self, probs: npt.NDArray[np.float64] | None = None) -> npt.NDArray[np.float64]:
         if probs is not None:
-            msg = "Pre-computed probabilities are not used for context-free calibration"
-            warnings.warn(msg)
+            logger.warning("Predicted probabilities are not used for context-free calibration")
 
         data = [{"prompt": self.empty_token, "response": self.empty_token}]
         _, pred_probs = self.guard_model.predict(data, **self.model_kwargs)
+
+        logger.info("Prior probability: %s", pred_probs)
 
         return pred_probs

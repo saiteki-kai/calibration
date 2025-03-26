@@ -3,6 +3,8 @@ from abc import ABC, abstractmethod
 import numpy as np
 import numpy.typing as npt
 
+from tqdm import tqdm
+
 from src.core.calibrators.calibration import calibrate_py
 from src.core.classifiers.guard_model import GuardModel
 
@@ -27,7 +29,7 @@ class BaseCalibrator(ABC):
         calibrated_probs = []
         calibrated_pred_labels = []
 
-        for prob in pred_probs:
+        for prob in tqdm(pred_probs, desc="Calibrating predictions"):
             cal_prob = calibrate_py(prob, prior, mode=self.calibration_mode)
             calibrated_probs.append(cal_prob)
             pred_label = int(np.argmax(cal_prob.reshape(-1)))
