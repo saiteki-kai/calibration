@@ -97,6 +97,11 @@ def main(args: argparse.Namespace) -> None:
     )
     calibrated_predictions.to_json(output_path / "calibrated_predictions.json")
 
+    print(SEPARATOR)
+    print_metrics_summary(metrics)
+
+    print(SEPARATOR)
+
     # Plot all calibration curves in a single figure
     plot_calibration_curves(
         true_labels,
@@ -107,6 +112,23 @@ def main(args: argparse.Namespace) -> None:
         n_bins=args.plot_bins,
         title=args.model + "\n" + args.dataset_name,
     )
+
+
+def print_metrics_summary(metrics: dict[str, dict[str, float]]) -> None:
+    print("Metrics Comparison Summary\n")
+
+    metric_names = list(next(iter(metrics.values())).keys())
+
+    col_width = 12
+    columns = "".join("{:<{col_width}}".format(name, col_width=col_width) for name in metric_names)
+    header = "{:<15}".format("Method") + columns
+
+    print(header)
+    print("-" * (len(header) - (col_width - len(metric_names[-1]))))
+
+    for method, metric in metrics.items():
+        values = "".join("{:<{col_width}.3f}".format(metric[name], col_width=col_width) for name in metric_names)
+        print(f"{method:<15}{values}")
 
 
 def parse_args() -> argparse.Namespace:
