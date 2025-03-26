@@ -15,7 +15,7 @@ def plot_calibration_curves(
     n_bins: int = 20,
     output_path: Path | None = None,
     show_plot: bool = True,
-) -> plt.Figure:
+) -> plt.figure.Figure:
     sns.set_style("white")
     sns.set_context("paper", font_scale=2)
 

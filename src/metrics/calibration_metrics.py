@@ -1,3 +1,4 @@
+from typing import cast
 import numpy as np
 import numpy.typing as npt
 from netcal.metrics import ECE, MCE
@@ -28,8 +29,8 @@ def compute_metrics(
     mce_calculator = MCE(bins=ece_bins)
 
     # Calculate calibration metrics
-    ece_score = ece_calculator.measure(probs, true_labels)
-    mce_score = mce_calculator.measure(probs, true_labels)
+    ece_score = cast(float, ece_calculator.measure(probs, true_labels))
+    mce_score = cast(float, mce_calculator.measure(probs, true_labels))
     brier_score = brier_score_loss(true_labels, pred_labels)
 
     # Calculate classification metrics
@@ -57,10 +58,10 @@ def compute_metrics(
     return {
         "ece": ece_score,
         "mce": mce_score,
-        "brier": brier_score,
-        "f1": f1,
-        "precision": precision,
-        "recall": recall,
-        "accuracy": accuracy,
-        "auprc": auprc,
+        "brier": float(brier_score),
+        "f1": float(f1),
+        "precision": float(precision),
+        "recall": float(recall),
+        "accuracy": float(accuracy),
+        "auprc": float(auprc),
     }

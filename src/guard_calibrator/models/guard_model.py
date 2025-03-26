@@ -4,7 +4,6 @@ import numpy as np
 import numpy.typing as npt
 import torch
 
-from datasets import Dataset
 from tqdm import tqdm
 from transformers import GenerationConfig
 from transformers.generation import GenerateDecoderOnlyOutput
@@ -34,42 +33,45 @@ class GuardModel:
         self.pos_label = pos_label
         self.label_token_pos = label_token_pos
 
+    def prepare_input(self, example: dict[str, str]) -> str:
+        chat = [
+            {"role": "user", "content": example["prompt"]},
+            {"role": "assistant", "content": example["response"]},
+        ]
+
+        return str(self.tokenizer.apply_chat_template(chat, tokenize=False))
+
     @torch.inference_mode()
     def predict(
         self,
-        data: dict[str, str] | list[dict[str, str]] | Dataset,
+        data: list[dict[str, str]],
         max_new_tokens: int = 10,
-    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.int64]]:
-        if isinstance(data, list) or isinstance(data, Dataset):
-            results = []
+    ) -> tuple[npt.NDArray[np.int64], npt.NDArray[np.float64]]:
+        self.generation_config = self._prepare_generation_config(max_new_tokens)
 
-            for example in tqdm(data, desc="Computing predictions"):
-                result = self._predict(example, max_new_tokens)
-                results.append(result)
+        results = []
+        for example in tqdm(data, desc="Computing predictions"):
+            result = self._predict(example)
+            results.append(result)
 
-            pred_labels, label_probs = zip(*results)
-            pred_labels = np.array(pred_labels)
-            label_probs = np.array(label_probs)
+        pred_labels, label_probs = zip(*results)
+        pred_labels = np.asarray(pred_labels, dtype=np.int64)
+        label_probs = np.asarray(label_probs, dtype=np.float64)
 
-            return pred_labels, label_probs
+        return pred_labels, label_probs
 
-        else:
-            return self._predict(data, max_new_tokens)
-
-    def _generate(self, text: str, max_new_tokens: int = 10) -> tuple[torch.Tensor, torch.Tensor, int]:
+    def _generate(self, text: str) -> tuple[tuple[torch.Tensor], torch.Tensor, int]:
         inputs = self.tokenizer(text, return_tensors="pt")
-
-        # Configure generation parameters
-        config = self._prepare_generation_config(max_new_tokens)
+        inputs = {k: v.to(self.model.device) for k, v in inputs.items()}
 
         # Generate outputs
-        outputs = self.model.generate(**inputs.to(self.model.device), generation_config=config)
+        outputs = self.model.generate(**inputs, generation_config=self.generation_config)
         outputs = cast(GenerateDecoderOnlyOutput, outputs)
 
         if outputs.logits is None:
             raise ValueError("GenerationConfig.output_logits must be True to use this function.")
 
-        return outputs.logits, outputs.sequences, inputs.input_ids.shape[-1]
+        return outputs.logits, outputs.sequences, inputs["input_ids"].shape[-1]
 
     def _prepare_generation_config(self, max_new_tokens: int) -> GenerationConfig:
         config = self.model.generation_config
@@ -91,7 +93,9 @@ class GuardModel:
 
         return config
 
-    def _get_label_predictions(self, outputs: tuple[torch.Tensor, torch.Tensor, int]) -> tuple[int, torch.Tensor]:
+    def _get_label_predictions(
+        self, outputs: tuple[tuple[torch.Tensor], torch.Tensor, int]
+    ) -> tuple[int, npt.NDArray[np.float64]]:
         logits, sequences, prompt_len = outputs
 
         label_token_id = sequences[0][prompt_len + self.label_token_pos]
@@ -109,16 +113,7 @@ class GuardModel:
 
         return pred_label, label_probs.detach().cpu().numpy()
 
-    def _prepare_input(self, example: dict[str, object]) -> str:
-        chat = [
-            {"role": "user", "content": example["prompt"]},
-            {"role": "assistant", "content": example["response"]},
-        ]
-
-        return str(self.tokenizer.apply_chat_template(chat, tokenize=False))
-
-    def _predict(self, data: dict[str, object], max_new_tokens: int = 10) -> tuple[int, npt.NDArray[np.float64]]:
-        prompt = self._prepare_input(data)
-        outputs = self._generate(prompt, max_new_tokens)
-
+    def _predict(self, data: dict[str, str]) -> tuple[int, npt.NDArray[np.float64]]:
+        prompt = self.prepare_input(data)
+        outputs = self._generate(prompt)
         return self._get_label_predictions(outputs)

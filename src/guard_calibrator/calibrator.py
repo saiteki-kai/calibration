@@ -1,6 +1,7 @@
 import numpy as np
 import numpy.typing as npt
 
+from .calibrators.base import BaseCalibrator
 from .calibrators.batch import BatchCalibrator
 from .calibrators.context_free import ContextFreeCalibrator
 from .models.guard_model import GuardModel
@@ -11,7 +12,7 @@ class GuardModelCalibrator:
         self.guard_model = guard_model
         self.method = method
 
-        calibrators = {
+        calibrators: dict[str, type[BaseCalibrator]] = {
             "context-free": ContextFreeCalibrator,
             "batch": BatchCalibrator,
         }
@@ -48,14 +49,14 @@ class GuardModelCalibrator:
 
         return results[0] if len(results) == 1 else results
 
-    def calibrate(self, data):
+    def predict_and_calibrate(self, data):
         preds = self.predict(data)
         probs, pred_labels = self._format_predictions(preds)
         calibrated_probs, calibrated_pred_labels = self.calibrator.calibrate(probs, pred_labels)
 
         return self._format_results(calibrated_probs, calibrated_pred_labels)
 
-    def calibrate_predictions(self, probs: npt.NDArray[np.float64], pred_labels: npt.NDArray[np.int64]):
+    def calibrate(self, probs: npt.NDArray[np.float64], pred_labels: npt.NDArray[np.int64]):
         return self.calibrator.calibrate(probs, pred_labels)
 
     def compute_prior(self, precomputed_probs=None):

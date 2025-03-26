@@ -20,3 +20,7 @@ show-fixes = true
 lines-after-imports = 2
 lines-between-types = 1
 combine-as-imports = true
+
+[tool.ruff.format]
+quote-style = "double"
+docstring-code-format = true
