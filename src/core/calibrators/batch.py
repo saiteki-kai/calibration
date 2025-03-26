@@ -1,10 +1,16 @@
 import logging
 
+from typing import TYPE_CHECKING
+
 import numpy as np
-import numpy.typing as npt
 
 from src.core.calibrators.base import BaseCalibrator
 from src.core.classifiers.guard_model import GuardModel
+
+
+if TYPE_CHECKING:
+    from numpy import float64
+    from numpy.typing import NDArray
 
 
 logger = logging.getLogger(__name__)
@@ -15,7 +21,7 @@ class BatchCalibrator(BaseCalibrator):
         super().__init__(guard_model)
         self.calibration_mode = "identity"
 
-    def compute_prior(self, probs: npt.NDArray[np.float64] | None = None) -> npt.NDArray[np.float64]:
+    def compute_prior(self, probs: "NDArray[float64] | None" = None) -> "NDArray[float64]":
         if probs is None:
             msg = "Batch calibration requires pre-computed probabilities"
             raise ValueError(msg)

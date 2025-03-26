@@ -1,14 +1,14 @@
 from typing import TYPE_CHECKING, Any
 
-import numpy as np
-import numpy.typing as npt
-
 from src.core.calibrators.batch import BatchCalibrator
 from src.core.calibrators.context_free import ContextFreeCalibrator
 from src.core.classifiers.guard_model import GuardModel
 
 
 if TYPE_CHECKING:
+    from numpy import float64, int64
+    from numpy.typing import NDArray
+
     from src.core.calibrators.base import BaseCalibrator
 
 
@@ -36,18 +36,18 @@ class GuardModelCalibrator:
 
     def calibrate(
         self,
-        probs: npt.NDArray[np.float64],
-        pred_labels: npt.NDArray[np.int64],
-    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.int64]]:
+        probs: "NDArray[float64]",
+        pred_labels: "NDArray[int64]",
+    ) -> tuple["NDArray[float64]", "NDArray[int64]"]:
         return self.calibrator.calibrate(probs, pred_labels)
 
-    def compute_prior(self, precomputed_probs: npt.NDArray[np.float64] | None = None) -> npt.NDArray[np.float64]:
+    def compute_prior(self, precomputed_probs: "NDArray[float64] | None" = None) -> "NDArray[float64]":
         return self.calibrator.compute_prior(precomputed_probs)
 
     def _format_results(
         self,
-        calibrated_probs: npt.NDArray[np.float64],
-        calibrated_pred_labels: npt.NDArray[np.int64],
+        calibrated_probs: "NDArray[float64]",
+        calibrated_pred_labels: "NDArray[int64]",
     ) -> list[dict[str, Any]]:
         return [
             {

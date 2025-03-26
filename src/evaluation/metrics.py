@@ -1,9 +1,6 @@
 import logging
 
-from typing import cast
-
-import numpy as np
-import numpy.typing as npt
+from typing import TYPE_CHECKING, cast
 
 from netcal.metrics import ECE, MCE
 from sklearn.metrics import (
@@ -18,13 +15,18 @@ from sklearn.metrics import (
 )
 
 
+if TYPE_CHECKING:
+    from numpy import float64, int64
+    from numpy.typing import NDArray
+
+
 logger = logging.getLogger(__name__)
 
 
 def compute_metrics(
-    true_labels: npt.NDArray[np.int64],
-    probs: npt.NDArray[np.float64],
-    pred_labels: npt.NDArray[np.int64],
+    true_labels: "NDArray[int64]",
+    probs: "NDArray[float64]",
+    pred_labels: "NDArray[int64]",
     ece_bins: int = 15,
     verbose: bool = True,
 ) -> dict[str, float]:

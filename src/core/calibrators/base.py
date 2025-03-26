@@ -1,12 +1,17 @@
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
 import numpy as np
-import numpy.typing as npt
 
 from tqdm import tqdm
 
 from src.core.calibrators.calibration import calibrate_py
 from src.core.classifiers.guard_model import GuardModel
+
+
+if TYPE_CHECKING:
+    from numpy import float64, int64
+    from numpy.typing import NDArray
 
 
 class BaseCalibrator(ABC):
@@ -15,15 +20,15 @@ class BaseCalibrator(ABC):
         self.calibration_mode = "diagonal"
 
     @abstractmethod
-    def compute_prior(self, probs: npt.NDArray[np.float64] | None = None) -> npt.NDArray[np.float64]:
+    def compute_prior(self, probs: "NDArray[float64] | None" = None) -> "NDArray[float64]":
         msg = "Subclasses must implement compute_prior method"
         raise NotImplementedError(msg)
 
     def calibrate(
         self,
-        pred_probs: npt.NDArray[np.float64],
-        _pred_labels: npt.NDArray[np.int64],
-    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.int64]]:
+        pred_probs: "NDArray[float64]",
+        _pred_labels: "NDArray[int64]",
+    ) -> tuple["NDArray[float64]", "NDArray[int64]"]:
         prior = self.compute_prior(pred_probs)
 
         calibrated_probs = []
@@ -42,9 +47,9 @@ class BaseCalibrator(ABC):
 
     def calibrate_with_prior(
         self,
-        probs: npt.NDArray[np.float64],
-        _labels: npt.NDArray[np.int64],
-        _pred_labels: npt.NDArray[np.int64],
-        _pred_probs: npt.NDArray[np.float64],
-    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.int64]]:
+        probs: "NDArray[float64]",
+        _labels: "NDArray[int64]",
+        _pred_labels: "NDArray[int64]",
+        _pred_probs: "NDArray[float64]",
+    ) -> tuple["NDArray[float64]", "NDArray[int64]"]:
         return self.calibrate(probs, _pred_labels)

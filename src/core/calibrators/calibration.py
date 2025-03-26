@@ -1,12 +1,14 @@
+from typing import TYPE_CHECKING
+
 import numpy as np
-import numpy.typing as npt
 
 
-def calibrate_py(
-    p_y: npt.NDArray[np.float64],
-    p_cf: npt.NDArray[np.float64],
-    mode: str = "diagonal",
-) -> npt.NDArray[np.float64]:
+if TYPE_CHECKING:
+    from numpy import float64
+    from numpy.typing import NDArray
+
+
+def calibrate_py(p_y: "NDArray[float64]", p_cf: "NDArray[float64]", mode: str = "diagonal") -> "NDArray[float64]":
     if mode not in ["diagonal", "identity"]:
         msg = f"Invalid calibration mode: {mode}. Must be one of: ['diagonal', 'identity']"
         raise ValueError(msg)

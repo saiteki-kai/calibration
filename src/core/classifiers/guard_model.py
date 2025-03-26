@@ -1,7 +1,6 @@
 from typing import TYPE_CHECKING, cast
 
 import numpy as np
-import numpy.typing as npt
 import torch
 
 from tqdm import tqdm
@@ -9,7 +8,10 @@ from transformers import GenerationConfig
 
 
 if TYPE_CHECKING:
+    from numpy import float64, int64
+    from numpy.typing import NDArray
     from transformers.generation import GenerateDecoderOnlyOutput
+
 
 from src.core.classifiers.chat_template import load_chat_template
 from src.core.classifiers.loader import load_model
@@ -48,7 +50,7 @@ class GuardModel:
         self,
         data: list[dict[str, str]],
         max_new_tokens: int = 10,
-    ) -> tuple[npt.NDArray[np.int64], npt.NDArray[np.float64]]:
+    ) -> tuple["NDArray[int64]", "NDArray[float64]"]:
         self.generation_config = self._prepare_generation_config(max_new_tokens)
 
         results = []
@@ -99,7 +101,7 @@ class GuardModel:
     def _get_label_predictions(
         self,
         outputs: tuple[tuple[torch.Tensor], torch.Tensor, int],
-    ) -> tuple[int, npt.NDArray[np.float64]]:
+    ) -> tuple[int, "NDArray[float64]"]:
         logits, sequences, prompt_len = outputs
 
         label_token_id = sequences[0][prompt_len + self.label_token_pos]
@@ -118,7 +120,7 @@ class GuardModel:
 
         return pred_label, label_probs.detach().cpu().numpy()
 
-    def _predict(self, data: dict[str, str]) -> tuple[int, npt.NDArray[np.float64]]:
+    def _predict(self, data: dict[str, str]) -> tuple[int, "NDArray[float64]"]:
         prompt = self.prepare_input(data)
         outputs = self._generate(prompt)
         return self._get_label_predictions(outputs)
