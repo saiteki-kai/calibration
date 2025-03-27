@@ -88,8 +88,8 @@ def main(args: argparse.Namespace) -> None:
     print(SEPARATOR)
 
     # Save metrics
-    with (output_path / "metrics.json").open("w") as f:
-        json.dump(metrics, f)
+    with (output_path / "metrics.json").open("w", encoding="utf-8") as f:
+        json.dump(metrics, f, indent=4)
 
     # Save calibrated results
     calibrated_predictions = Dataset.from_dict(
@@ -100,9 +100,8 @@ def main(args: argparse.Namespace) -> None:
     print(SEPARATOR)
     print_metrics_summary(metrics)
 
-    print(SEPARATOR)
-
     # Plot all calibration curves in a single figure
+    print(SEPARATOR)
     plot_calibration_curves(
         true_labels,
         label_probs,
