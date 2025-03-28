@@ -24,11 +24,7 @@ class BaseCalibrator(ABC):
         msg = "Subclasses must implement compute_prior method"
         raise NotImplementedError(msg)
 
-    def calibrate(
-        self,
-        pred_probs: "NDArray[float64]",
-        _pred_labels: "NDArray[int64]",
-    ) -> tuple["NDArray[float64]", "NDArray[int64]"]:
+    def calibrate(self, pred_probs: "NDArray[float64]") -> tuple["NDArray[float64]", "NDArray[int64]"]:
         prior = self.compute_prior()
 
         calibrated_probs = []

@@ -78,7 +78,7 @@ def main(args: argparse.Namespace) -> None:
         print(f"Method: {method_name}\n")
 
         # Calibrate predictions using pre-computed probabilities
-        cal_probs, cal_pred_labels = calibrator.calibrate(label_probs, pred_labels)
+        cal_probs, cal_pred_labels = calibrator.calibrate(label_probs)
         calibrated_results.append((method_name, cal_probs, cal_pred_labels))
 
         metrics[method_name] = compute_metrics(
