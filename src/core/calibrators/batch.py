@@ -1,6 +1,6 @@
 import logging
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -17,13 +17,20 @@ logger = logging.getLogger(__name__)
 
 
 class BatchCalibrator(BaseCalibrator):
-    def __init__(self, guard_model: GuardModel, probs: "NDArray[float64]") -> None:
-        super().__init__(guard_model)
-        self.calibration_mode = "identity"
-        self.probs = probs
+    _probs: "NDArray[float64]"
 
-    def compute_prior(self) -> "NDArray[float64]":
-        avg_probs = np.mean(self.probs, axis=0)
+    def __init__(
+        self,
+        guard_model: GuardModel,
+        probs: "NDArray[float64]",
+        model_kwargs: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(guard_model, model_kwargs)
+        self._calibration_mode = "identity"
+        self._probs = probs
+
+    def _compute_prior(self) -> "NDArray[float64]":
+        avg_probs = np.mean(self._probs, axis=0)
         logger.info("Prior probability: %s", avg_probs)
 
         return avg_probs
