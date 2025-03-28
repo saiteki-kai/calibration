@@ -3,18 +3,22 @@ import json
 import os
 
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
 from datasets import Dataset, load_dataset
 from transformers import set_seed
 
-from src.core.calibrator import GuardModelCalibrator
+from src.core.calibrators.batch import BatchCalibrator
+from src.core.calibrators.context_free import ContextFreeCalibrator
 from src.core.classifiers.guard_model import GuardModel
 from src.evaluation.metrics import compute_metrics
 from src.evaluation.visualization import plot_calibration_curves
 
+
+if TYPE_CHECKING:
+    from src.core.calibrators.base import BaseCalibrator
 
 SEPARATOR = "-" * os.get_terminal_size().columns
 
@@ -33,7 +37,7 @@ def main(args: argparse.Namespace) -> None:
     if args.sample_size is not None:
         dataset = dataset.select(range(args.sample_size))
 
-    # Initialize model
+    # Initialize the guard model
     guard_model = GuardModel(args.model, taxonomy=args.taxonomy, descriptions=args.descriptions)
 
     # Get uncalibrated predictions first
@@ -62,22 +66,22 @@ def main(args: argparse.Namespace) -> None:
     )
     predictions.to_json(output_path / "predictions.json")
 
-    methods = ["batch", "context-free"]
+    calibrators: dict[str, BaseCalibrator] = {
+        "context-free": ContextFreeCalibrator(guard_model),
+        "batch": BatchCalibrator(guard_model, label_probs),
+    }
+
     calibrated_results = []
 
-    for method in methods:
+    for method_name, calibrator in calibrators.items():
         print(SEPARATOR)
-        print(f"Method: {method}\n")
-
-        # Initialize calibrator
-        calibrator = GuardModelCalibrator(guard_model, method=method)
+        print(f"Method: {method_name}\n")
 
         # Calibrate predictions using pre-computed probabilities
         cal_probs, cal_pred_labels = calibrator.calibrate(label_probs, pred_labels)
-        calibrated_results.append((method, cal_probs, cal_pred_labels))
+        calibrated_results.append((method_name, cal_probs, cal_pred_labels))
 
-        # Compute metrics for calibrated results
-        metrics[method] = compute_metrics(
+        metrics[method_name] = compute_metrics(
             true_labels,
             cal_probs,
             cal_pred_labels,
@@ -97,10 +101,11 @@ def main(args: argparse.Namespace) -> None:
     )
     calibrated_predictions.to_json(output_path / "calibrated_predictions.json")
 
+    # Show metrics summary and calibration curves
+
     print(SEPARATOR)
     print_metrics_summary(metrics)
 
-    # Plot all calibration curves in a single figure
     print(SEPARATOR)
     plot_calibration_curves(
         true_labels,

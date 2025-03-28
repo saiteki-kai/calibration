@@ -20,7 +20,7 @@ class BaseCalibrator(ABC):
         self.calibration_mode = "diagonal"
 
     @abstractmethod
-    def compute_prior(self, probs: "NDArray[float64] | None" = None) -> "NDArray[float64]":
+    def compute_prior(self) -> "NDArray[float64]":
         msg = "Subclasses must implement compute_prior method"
         raise NotImplementedError(msg)
 
@@ -29,7 +29,7 @@ class BaseCalibrator(ABC):
         pred_probs: "NDArray[float64]",
         _pred_labels: "NDArray[int64]",
     ) -> tuple["NDArray[float64]", "NDArray[int64]"]:
-        prior = self.compute_prior(pred_probs)
+        prior = self.compute_prior()
 
         calibrated_probs = []
         calibrated_pred_labels = []
@@ -44,12 +44,3 @@ class BaseCalibrator(ABC):
             np.array(calibrated_probs).squeeze(),
             np.array(calibrated_pred_labels).squeeze(),
         )
-
-    def calibrate_with_prior(
-        self,
-        probs: "NDArray[float64]",
-        _labels: "NDArray[int64]",
-        _pred_labels: "NDArray[int64]",
-        _pred_probs: "NDArray[float64]",
-    ) -> tuple["NDArray[float64]", "NDArray[int64]"]:
-        return self.calibrate(probs, _pred_labels)

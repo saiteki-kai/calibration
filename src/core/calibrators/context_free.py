@@ -26,13 +26,10 @@ class ContextFreeCalibrator(BaseCalibrator):
         self.empty_token = empty_token or " "
         self.model_kwargs = model_kwargs or {}
 
-    def compute_prior(self, probs: "NDArray[float64] | None" = None) -> "NDArray[float64]":
-        if probs is not None:
-            logger.warning("Predicted probabilities are not used for context-free calibration")
-
+    def compute_prior(self) -> "NDArray[float64]":
         data = [{"prompt": self.empty_token, "response": self.empty_token}]
-        _, pred_probs = self.guard_model.predict(data, **self.model_kwargs)
 
+        _, pred_probs = self.guard_model.predict(data, **self.model_kwargs)
         logger.info("Prior probability: %s", pred_probs)
 
         return pred_probs

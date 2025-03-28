@@ -17,16 +17,13 @@ logger = logging.getLogger(__name__)
 
 
 class BatchCalibrator(BaseCalibrator):
-    def __init__(self, guard_model: GuardModel) -> None:
+    def __init__(self, guard_model: GuardModel, probs: "NDArray[float64]") -> None:
         super().__init__(guard_model)
         self.calibration_mode = "identity"
+        self.probs = probs
 
-    def compute_prior(self, probs: "NDArray[float64] | None" = None) -> "NDArray[float64]":
-        if probs is None:
-            msg = "Batch calibration requires pre-computed probabilities"
-            raise ValueError(msg)
-
-        avg_probs = np.mean(probs, axis=0)
+    def compute_prior(self) -> "NDArray[float64]":
+        avg_probs = np.mean(self.probs, axis=0)
         logger.info("Prior probability: %s", avg_probs)
 
         return avg_probs
