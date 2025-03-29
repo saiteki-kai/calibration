@@ -2,6 +2,8 @@ import logging
 
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
+
 from src.core.calibrators.base import BaseCalibrator
 from src.core.classifiers.guard_model import GuardModel
 
@@ -15,22 +17,27 @@ logger = logging.getLogger(__name__)
 
 
 class ContextFreeCalibrator(BaseCalibrator):
-    _empty_token: str
+    _token: str | list[str]
 
     def __init__(
         self,
         guard_model: GuardModel,
-        empty_token: str | None = None,
+        token: str | list[str] | None = None,
         model_kwargs: dict[str, Any] | None = None,
     ) -> None:
         super().__init__(guard_model, model_kwargs)
         self._calibration_mode = "diagonal"
-        self._empty_token = empty_token or " "
+        if token is None:
+            token = ["N/A", " ", "[MASK]"]
+        self._token = [token] if isinstance(token, str) else token
 
     def _compute_prior(self) -> "NDArray[float64]":
-        data = [{"prompt": self._empty_token, "response": self._empty_token}]
+        data = [{"prompt": token, "response": token} for token in self._token]
 
         _, pred_probs = self._guard_model.predict(data, **self._model_kwargs)
-        logger.info("Prior probability: %s", pred_probs)
+        logger.info("Prior probabilities: %s", zip(self._token, pred_probs))
 
-        return pred_probs
+        average_probs = np.mean(pred_probs, axis=0)
+        logger.info("Average probability: %s", average_probs)
+
+        return average_probs
