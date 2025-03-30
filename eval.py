@@ -120,20 +120,20 @@ def compute_predictions(guard_model: GuardModel, dataset: Dataset, output_path: 
 
 
 def print_metrics_summary(metrics: dict[str, dict[str, float]]) -> None:
-    print("Metrics Comparison Summary\n")
-
     metric_names = list(next(iter(metrics.values())).keys())
 
-    col_width = 12
-    columns = "".join("{:<{col_width}}".format(name, col_width=col_width) for name in metric_names)
-    header = "{:<15}".format("Method") + columns
+    col_width = max(len(name) for name in metric_names) + 2
+    columns = "".join(f"{name:<{col_width}}" for name in metric_names)
+
+    method_col_width = max(len(name) for name in metrics) + 4
+    header = f"{'Method':<{method_col_width}}" + columns
 
     print(header)
     print("-" * (len(header) - (col_width - len(metric_names[-1]))))
 
     for method, metric in metrics.items():
-        values = "".join("{:<{col_width}.3f}".format(metric[name], col_width=col_width) for name in metric_names)
-        print(f"{method:<15}{values}")
+        values = "".join(f"{metric[name]:<{col_width}.3f}" for name in metric_names)
+        print(f"{method:{method_col_width}}{values}")
 
 
 def parse_args() -> argparse.Namespace:
