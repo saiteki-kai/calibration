@@ -73,3 +73,20 @@ def compute_metrics(true_labels: "NDArray[int64]", preds: PredictionOutput, ece_
         "accuracy": float(accuracy),
         "auprc": float(auprc),
     }
+
+
+def print_summary(metrics: dict[str, dict[str, float]]) -> None:
+    metric_names = list(next(iter(metrics.values())).keys())
+
+    col_width = max(len(name) for name in metric_names) + 2
+    columns = "".join(f"{name:<{col_width}}" for name in metric_names)
+
+    method_col_width = max(len(name) for name in metrics) + 4
+    header = f"{'Method':<{method_col_width}}" + columns
+
+    print(header)
+    print("-" * (len(header) - (col_width - len(metric_names[-1]))))
+
+    for method, metric in metrics.items():
+        values = "".join(f"{metric[name]:<{col_width}.3f}" for name in metric_names)
+        print(f"{method:{method_col_width}}{values}")

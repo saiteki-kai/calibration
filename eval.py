@@ -13,7 +13,7 @@ from transformers import set_seed
 from src.core.calibrators import BatchCalibrator, ContextFreeCalibrator, TemperatureCalibrator
 from src.core.classifiers import GuardModel
 from src.core.types import ClassifierOutput, PredictionOutput
-from src.evaluation.metrics import compute_metrics
+from src.evaluation.metrics import compute_metrics, print_summary
 from src.evaluation.visualization import plot_calibration_curves
 
 
@@ -82,7 +82,7 @@ def main(args: argparse.Namespace) -> None:
     # Show metrics summary and calibration curves
 
     print(SEPARATOR)
-    print_metrics_summary(metrics)
+    print_summary(metrics)
 
     print(SEPARATOR)
 
@@ -117,23 +117,6 @@ def compute_predictions(guard_model: GuardModel, dataset: Dataset, output_path: 
         print(f"Saved predictions to {pred_output_path}")
 
     return output
-
-
-def print_metrics_summary(metrics: dict[str, dict[str, float]]) -> None:
-    metric_names = list(next(iter(metrics.values())).keys())
-
-    col_width = max(len(name) for name in metric_names) + 2
-    columns = "".join(f"{name:<{col_width}}" for name in metric_names)
-
-    method_col_width = max(len(name) for name in metrics) + 4
-    header = f"{'Method':<{method_col_width}}" + columns
-
-    print(header)
-    print("-" * (len(header) - (col_width - len(metric_names[-1]))))
-
-    for method, metric in metrics.items():
-        values = "".join(f"{metric[name]:<{col_width}.3f}" for name in metric_names)
-        print(f"{method:{method_col_width}}{values}")
 
 
 def parse_args() -> argparse.Namespace:
