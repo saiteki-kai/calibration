@@ -1,0 +1,263 @@
+import argparse
+
+from pathlib import Path
+from typing import Any, cast
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+
+from datasets import Dataset, load_dataset
+from sklearn.metrics import log_loss
+from transformers import set_seed
+
+from src.core.calibrators import BatchCalibrator, TemperatureCalibrator
+from src.core.classifiers import GuardModel
+from src.core.types import ClassifierOutput
+from src.evaluation.metrics import compute_metrics
+
+
+def tune_parameter(
+    args: argparse.Namespace,
+    guard_model: GuardModel,
+    pred_output: ClassifierOutput,
+    validation_set: Dataset,
+    param_name: str,
+    param_range: np.ndarray[float, np.dtype[np.float64]],
+    model_kwargs: dict[str, Any],
+) -> tuple[float | None, dict[str, float], dict[str, list[float]]]:
+    true_labels = np.asarray([0 if x["is_safe"] else 1 for x in validation_set.to_list()])
+
+    best_param = None
+    best_nll = float("inf")
+    best_metrics = {}
+
+    metrics_history = {
+        param_name: [],
+        "nll": [],
+        "ece": [],
+        "mce": [],
+        "accuracy": [],
+        "f1": [],
+        "precision": [],
+        "recall": [],
+    }
+
+    for param_value in param_range:
+        if param_name == "temperature":
+            calibrator = TemperatureCalibrator(guard_model, temperature=param_value, model_kwargs=model_kwargs)
+        elif param_name == "batch":
+            calibrator = BatchCalibrator(guard_model, pred_output.label_probs, model_kwargs=model_kwargs)
+        else:
+            msg = f"Unknown parameter: {param_name}"
+            raise ValueError(msg)
+
+        cal_output = calibrator.calibrate(pred_output)
+        metrics = compute_metrics(true_labels, cal_output, ece_bins=args.ece_bins)
+
+        nll = log_loss(true_labels, cal_output.label_probs[:, 1])
+        metrics["nll"] = float(nll)
+
+        # Store metrics for plotting
+        metrics_history[param_name].append(param_value)
+        metrics_history["ece"].append(metrics["ece"])
+        metrics_history["mce"].append(metrics["mce"])
+        metrics_history["accuracy"].append(metrics["accuracy"])
+        metrics_history["f1"].append(metrics["f1"])
+        metrics_history["precision"].append(metrics["precision"])
+        metrics_history["recall"].append(metrics["recall"])
+        metrics_history["nll"].append(nll)
+
+        # Check if this parameter value is the best so far
+        if metrics["nll"] < best_nll:
+            best_nll = metrics["nll"]
+            best_param = param_value
+            best_metrics = metrics
+
+    return best_param, best_metrics, metrics_history
+
+
+def plot_metrics(metrics_history: dict[str, list[float]], param_name: str, output_path: Path) -> None:
+    sns.set_style("whitegrid")
+    sns.set_context("paper", font_scale=1.5)
+
+    df_metrics = pd.DataFrame(metrics_history)
+
+    fig, axes = plt.subplots(3, 1, figsize=(12, 14), sharex=True)
+
+    # NLL Plot
+    sns.lineplot(
+        data=df_metrics,
+        x=param_name,
+        y="nll",
+        ax=axes[0],
+    )
+
+    # Add best parameter vertical line
+    best_param_value = df_metrics.loc[df_metrics["nll"].idxmin(), param_name]
+    axes[0].axvline(
+        x=best_param_value, color="red", linestyle="--", alpha=0.7, label=f"Best {param_name}={best_param_value:.3f}"
+    )
+
+    # Calibration Metrics Plot
+    calibration_metrics = ["ece", "mce"]
+    melted_cal = pd.melt(
+        df_metrics, id_vars=[param_name], value_vars=calibration_metrics, var_name="Metric", value_name="Value"
+    )
+
+    sns.lineplot(
+        data=melted_cal,
+        x=param_name,
+        y="Value",
+        hue="Metric",
+        style="Metric",
+        # markers=True,
+        dashes=False,
+        palette="husl",
+        linewidth=2,
+        markersize=8,
+        # marker="o",
+        # alpha=0.8,
+        ax=axes[1],
+    )
+
+    # Add best parameter vertical line
+    best_param_value = df_metrics.loc[df_metrics["nll"].idxmin(), param_name]
+    axes[1].axvline(
+        x=best_param_value, color="red", linestyle="--", alpha=0.7, label=f"Best {param_name}={best_param_value:.3f}"
+    )
+
+    axes[1].set_title(f"Calibration Metrics vs. {param_name.capitalize()}")
+    axes[1].set_ylabel("Error Value")
+    axes[1].legend(title="Metric")
+    axes[1].grid(True, linestyle="--", alpha=0.7)
+
+    # Add text annotation for the best value
+    best_nll = df_metrics["nll"].min()
+    axes[0].annotate(
+        f"Best NLL: {best_nll:.4f}",
+        xy=(best_param_value, best_nll),
+        xytext=(10, 15),
+        textcoords="offset points",
+        # arrowprops={"arrowstyle": "->", "color": "black", "alpha": 0.7},
+        bbox={"boxstyle": "round,pad=0.3", "fc": "yellow", "alpha": 0.3},
+    )
+
+    # Classification Metrics Plot
+    classification_metrics = ["accuracy", "f1", "precision", "recall"]
+    melted_class = pd.melt(
+        df_metrics, id_vars=[param_name], value_vars=classification_metrics, var_name="Metric", value_name="Value"
+    )
+
+    sns.lineplot(
+        data=melted_class,
+        x=param_name,
+        y="Value",
+        hue="Metric",
+        style="Metric",
+        # markers=True,
+        dashes=False,
+        palette="husl",
+        linewidth=2,
+        markersize=8,
+        # marker="s",
+        # alpha=0.8,
+        ax=axes[2],
+    )
+
+    # Add best parameter vertical line
+    axes[2].axvline(
+        x=best_param_value, color="red", linestyle="--", alpha=0.7, label=f"Best {param_name}={best_param_value:.3f}"
+    )
+
+    axes[2].set_title(f"Classification Metrics vs. {param_name.capitalize()}")
+    axes[2].set_xlabel(f"{param_name.capitalize()} Value")
+    axes[2].set_ylabel("Metric Value")
+    axes[2].legend(title="Metric")
+    axes[2].grid(True, linestyle="--", alpha=0.7)
+
+    # Add text annotations for values at the best parameter
+
+    idx = np.argmin(np.abs(np.array(df_metrics[param_name]) - best_param_value))
+    y_val = df_metrics["nll"].iloc[idx]
+    axes[0].scatter([best_param_value], [y_val], color="red", zorder=5, s=50)
+
+    for metric in calibration_metrics:
+        y_val = df_metrics[metric].iloc[idx]
+        axes[1].scatter([best_param_value], [y_val], color="red", zorder=5, s=50)
+
+    for metric in classification_metrics:
+        y_val = df_metrics[metric].iloc[idx]
+        axes[2].scatter([best_param_value], [y_val], color="red", zorder=5, s=50)
+
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+
+    output_path.mkdir(parents=True, exist_ok=True)
+    plt.savefig(output_path / f"{param_name}_tuning_metrics.png", dpi=300, bbox_inches="tight")
+    plt.savefig(output_path / f"{param_name}_tuning_metrics.pdf", dpi=300, bbox_inches="tight")
+
+    plt.close("all")
+
+
+def main(args: argparse.Namespace) -> None:
+    # Set random seed for reproducibility
+    set_seed(args.seed)
+
+    # Load the dataset
+    dataset = load_dataset(args.dataset_name, split="330k_train")
+    dataset = cast("Dataset", dataset)
+
+    # Create a validation set (10% of the training data)
+    validation_set = dataset.train_test_split(test_size=0.01, seed=args.seed)["test"]
+
+    guard_model = GuardModel(args.model, taxonomy=args.taxonomy, descriptions=args.descriptions)
+    model_kwargs = {"max_new_tokens": 10}
+
+    # Load or Compute Predictions
+    pred_output_path = Path(args.output_path) / "tuning" / "predictions.npz"
+    pred_output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if pred_output_path.exists():
+        pred_output = ClassifierOutput.from_npz(pred_output_path)
+        print(f"Loaded predictions from {pred_output_path}")
+    else:
+        pred_output = guard_model.predict(validation_set.to_list(), model_kwargs=model_kwargs)
+        pred_output.to_npz(pred_output_path)
+        print(f"Saved predictions to {pred_output_path}")
+
+    # Tune temperature
+    best_temperature, best_temp_metrics, temp_metrics_history = tune_parameter(
+        args,
+        guard_model,
+        pred_output,
+        validation_set,
+        "temperature",
+        np.arange(0.1, 30.0, 0.1),
+        model_kwargs=model_kwargs,
+    )
+
+    tuning_plots_path = Path(args.output_path) / "tuning" / "plots"
+    tuning_plots_path.mkdir(parents=True, exist_ok=True)
+    plot_metrics(temp_metrics_history, "temperature", tuning_plots_path)
+
+    print(f"Best Temperature: {best_temperature}")
+    print(f"Best Metrics (Temperature): {best_temp_metrics}")
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Tune calibration parameters for Llama Guard 3")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
+    parser.add_argument("--model", type=str, default="meta-llama/Llama-Guard-3-1B", help="Model to use")
+    parser.add_argument("--dataset-name", type=str, default="PKU-Alignment/Beavertails", help="Dataset name")
+    parser.add_argument("--taxonomy", type=str, default="llama-guard-3", help="Taxonomy used in chat template")
+    parser.add_argument("--descriptions", type=bool, default=False, help="Whether to use safety descriptions")
+    parser.add_argument("--ece-bins", type=int, default=15, help="Number of bins for ECE calculation")
+    parser.add_argument("--output-path", type=Path, default="results", help="Path to save tuning results")
+
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_args()
+    main(args)
