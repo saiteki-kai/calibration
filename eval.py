@@ -17,7 +17,6 @@ from src.core.classifiers.guard_model import GuardModel
 from src.core.types import ClassifierOutput, PredictionOutput
 from src.evaluation.metrics import compute_metrics
 from src.evaluation.visualization import plot_calibration_curves
-from utils import load_predictions, save_predictions
 
 
 if TYPE_CHECKING:
@@ -79,14 +78,8 @@ def main(args: argparse.Namespace) -> None:
         json.dump(metrics, f, indent=4)
 
     # Save calibrated results
-    calibrated_predictions = Dataset.from_dict(
-        {
-            "method": list(calibrated_results.keys()),
-            "calibrated_probs": [result.label_probs for result in calibrated_results.values()],
-            "calibrated_labels": [result.pred_labels for result in calibrated_results.values()],
-        }
-    )
-    calibrated_predictions.to_json(output_path / "calibrated_predictions.json")
+    for method_name, cal_output in calibrated_results.items():
+        cal_output.to_npz(output_path / "evaluation" / f"{method_name}_predictions.npz")
 
     # Show metrics summary and calibration curves
 
@@ -118,11 +111,11 @@ def compute_predictions(guard_model: GuardModel, dataset: Dataset, output_path: 
     pred_output_path.parent.mkdir(parents=True, exist_ok=True)
 
     if pred_output_path.exists():
-        output = load_predictions(pred_output_path)
+        output = ClassifierOutput.from_npz(pred_output_path)
         print(f"Loaded predictions from {pred_output_path}")
     else:
         output = guard_model.predict(dataset.to_list())
-        save_predictions(output, pred_output_path)
+        output.to_npz(pred_output_path)
         print(f"Saved predictions to {pred_output_path}")
 
     return output
