@@ -34,7 +34,7 @@ class ContextFreeCalibrator(BaseCalibrator):
     def _compute_prior(self) -> "NDArray[float64]":
         data = [{"prompt": token, "response": token} for token in self._token]
 
-        _, pred_probs = self._guard_model.predict(data, **self._model_kwargs)
+        _, pred_probs, _ = self._guard_model.predict(data, **self._model_kwargs)
         logger.info("Prior probabilities: %s", zip(self._token, pred_probs))
 
         average_probs = np.mean(pred_probs, axis=0)

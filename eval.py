@@ -12,6 +12,7 @@ from transformers import set_seed
 
 from src.core.calibrators.batch import BatchCalibrator
 from src.core.calibrators.context_free import ContextFreeCalibrator
+from src.core.calibrators.temperature import TemperatureCalibrator
 from src.core.classifiers.guard_model import GuardModel
 from src.evaluation.metrics import compute_metrics
 from src.evaluation.visualization import plot_calibration_curves
@@ -37,38 +38,25 @@ def main(args: argparse.Namespace) -> None:
     if args.sample_size is not None:
         dataset = dataset.select(range(args.sample_size))
 
+    true_labels = np.asarray([0 if x["is_safe"] else 1 for x in dataset.to_list()])
+
     # Initialize the guard model
     guard_model = GuardModel(args.model, taxonomy=args.taxonomy, descriptions=args.descriptions)
 
-    # Get uncalibrated predictions first
     print(SEPARATOR)
     print("Uncalibrated\n")
-    pred_labels, label_probs = guard_model.predict(dataset.to_list())
-    true_labels = np.asarray([0 if x["is_safe"] else 1 for x in dataset.to_list()])
+    pred_labels, label_probs, label_logits = compute_predictions(guard_model, dataset, output_path)
 
     # Compute metrics for uncalibrated results
     metrics = {}
-    metrics["uncalibrated"] = compute_metrics(
-        true_labels,
-        label_probs,
-        pred_labels,
-        ece_bins=args.ece_bins,
-        verbose=args.verbose,
-    )
+    metrics["uncalibrated"] = compute_metrics(true_labels, label_probs, pred_labels, ece_bins=args.ece_bins)
 
-    # Save uncalibrated results
-    predictions = Dataset.from_dict(
-        {
-            "label_probs": label_probs,
-            "pred_labels": pred_labels,
-            "true_labels": true_labels,
-        },
-    )
-    predictions.to_json(output_path / "predictions.json")
+    model_kwargs = {"max_new_tokens": 10}
 
     calibrators: dict[str, BaseCalibrator] = {
-        "context-free": ContextFreeCalibrator(guard_model),
-        "batch": BatchCalibrator(guard_model, label_probs),
+        "context-free": ContextFreeCalibrator(guard_model, token=["N/A"], model_kwargs=model_kwargs),
+        "batch": BatchCalibrator(guard_model, label_probs, model_kwargs=model_kwargs),
+        "temperature": TemperatureCalibrator(guard_model, temperature=5.0, model_kwargs=model_kwargs),
     }
 
     calibrated_results = []
@@ -77,17 +65,15 @@ def main(args: argparse.Namespace) -> None:
         print(SEPARATOR)
         print(f"Method: {method_name}\n")
 
-        # Calibrate predictions using pre-computed probabilities
-        cal_probs, cal_pred_labels = calibrator.calibrate(label_probs)
+        # Calibrate predictions using appropriate input
+        if method_name == "temperature":
+            cal_probs, cal_pred_labels = calibrator.calibrate(label_logits)
+        else:
+            cal_probs, cal_pred_labels = calibrator.calibrate(label_probs)
+
         calibrated_results.append((method_name, cal_probs, cal_pred_labels))
 
-        metrics[method_name] = compute_metrics(
-            true_labels,
-            cal_probs,
-            cal_pred_labels,
-            ece_bins=args.ece_bins,
-            verbose=args.verbose,
-        )
+        metrics[method_name] = compute_metrics(true_labels, cal_probs, cal_pred_labels, ece_bins=args.ece_bins)
 
     print(SEPARATOR)
 
@@ -116,6 +102,21 @@ def main(args: argparse.Namespace) -> None:
         n_bins=args.plot_bins,
         title=args.model + "\n" + args.dataset_name,
     )
+
+
+def compute_predictions(
+    guard_model: GuardModel,
+    dataset: Dataset,
+    output_path: Path,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    pred_labels, label_probs, label_logits = guard_model.predict(dataset.to_list())
+
+    predictions = Dataset.from_dict(
+        {"label_probs": label_probs, "pred_labels": pred_labels, "label_logits": label_logits}
+    )
+    predictions.to_json(output_path / "predictions.json")
+
+    return pred_labels, label_probs, label_logits
 
 
 def print_metrics_summary(metrics: dict[str, dict[str, float]]) -> None:

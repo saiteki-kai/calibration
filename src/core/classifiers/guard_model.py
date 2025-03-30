@@ -50,7 +50,7 @@ class GuardModel:
         self,
         data: list[dict[str, str]],
         max_new_tokens: int = 10,
-    ) -> tuple["NDArray[int64]", "NDArray[float64]"]:
+    ) -> tuple["NDArray[int64]", "NDArray[float64]", "NDArray[float64]"]:
         self._generation_config = self._prepare_generation_config(max_new_tokens)
 
         results = []
@@ -58,13 +58,14 @@ class GuardModel:
             result = self._predict(example)
             results.append(result)
 
-        pred_labels, label_probs = zip(*results)
+        pred_labels, label_probs, label_logits = zip(*results)
         pred_labels = np.asarray(pred_labels, dtype=np.int64)
         label_probs = np.asarray(label_probs, dtype=np.float64)
+        label_logits = np.asarray(label_logits, dtype=np.float64)
 
-        return pred_labels, label_probs
+        return pred_labels, label_probs, label_logits
 
-    def _predict(self, data: dict[str, str]) -> tuple[int, "NDArray[float64]"]:
+    def _predict(self, data: dict[str, str]) -> tuple[int, "NDArray[float64]", "NDArray[float64]"]:
         prompt = self._prepare_input(data)
         outputs = self._generate(prompt)
 
@@ -95,7 +96,7 @@ class GuardModel:
     def _extract_predictions(
         self,
         outputs: tuple[tuple[torch.Tensor], torch.Tensor, int],
-    ) -> tuple[int, "NDArray[float64]"]:
+    ) -> tuple[int, "NDArray[float64]", "NDArray[float64]"]:
         logits, sequences, prompt_len = outputs
 
         label_token_id = sequences[0][prompt_len + self._label_token_pos]
@@ -112,7 +113,7 @@ class GuardModel:
         label_logits = tuple(logits)[self._label_token_pos][0][self._label_token_ids]
         label_probs = torch.softmax(label_logits, dim=-1)
 
-        return pred_label, label_probs.detach().cpu().numpy()
+        return pred_label, label_probs.detach().cpu().numpy(), label_logits.detach().cpu().numpy()
 
     def _prepare_generation_config(self, max_new_tokens: int) -> GenerationConfig:
         config = self._model.generation_config
