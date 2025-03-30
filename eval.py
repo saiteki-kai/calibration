@@ -67,11 +67,7 @@ def main(args: argparse.Namespace) -> None:
         print(SEPARATOR)
         print(f"Method: {method_name}\n")
 
-        # Calibrate predictions using appropriate input
-        if method_name == "temperature":
-            cal_output = calibrator.calibrate(output.label_logits)
-        else:
-            cal_output = calibrator.calibrate(output.label_probs)
+        cal_output = calibrator.calibrate(output)
 
         calibrated_results[method_name] = cal_output
         metrics[method_name] = compute_metrics(true_labels, cal_output, ece_bins=args.ece_bins)

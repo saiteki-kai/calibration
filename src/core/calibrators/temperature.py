@@ -4,7 +4,7 @@ import numpy as np
 
 from src.core.calibrators.base import BaseCalibrator
 from src.core.classifiers.guard_model import GuardModel
-from src.core.types import CalibratorOutput
+from src.core.types import CalibratorOutput, ClassifierOutput
 
 
 if TYPE_CHECKING:
@@ -21,8 +21,8 @@ class TemperatureCalibrator(BaseCalibrator):
         self.T = temperature
 
     @override
-    def calibrate(self, logits: "NDArray[float64]") -> CalibratorOutput:
-        calibrated_probs = softmax(logits / self.T, axis=-1)
+    def calibrate(self, preds: ClassifierOutput) -> CalibratorOutput:
+        calibrated_probs = softmax(preds.label_logits / self.T, axis=-1)
         pred_labels = np.argmax(calibrated_probs, axis=1)
 
         return CalibratorOutput(label_probs=calibrated_probs, pred_labels=pred_labels)

@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from src.core.calibrators.calibration import calibrate_py
 from src.core.classifiers.guard_model import GuardModel
-from src.core.types import CalibratorOutput
+from src.core.types import CalibratorOutput, ClassifierOutput
 
 
 if TYPE_CHECKING:
@@ -25,13 +25,13 @@ class BaseCalibrator(ABC):
         self._calibration_mode = "diagonal"
         self._model_kwargs = model_kwargs or {}
 
-    def calibrate(self, probs: "NDArray[float64]") -> CalibratorOutput:
+    def calibrate(self, preds: ClassifierOutput) -> CalibratorOutput:
         prior = self._compute_prior()
 
         cal_probs = []
         cal_pred_labels = []
 
-        for prob in tqdm(probs, desc="Calibrating predictions"):
+        for prob in tqdm(preds.label_probs, desc="Calibrating predictions"):
             cal_prob = calibrate_py(prob, prior, mode=self._calibration_mode)
             cal_probs.append(cal_prob)
             pred_label = int(np.argmax(cal_prob.reshape(-1)))
