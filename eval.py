@@ -53,7 +53,7 @@ def main(args: argparse.Namespace) -> None:
     metrics = {}
     metrics["uncalibrated"] = compute_metrics(true_labels, output, ece_bins=args.ece_bins)
 
-    model_kwargs = {"max_new_tokens": 10}
+    model_kwargs = {"max_new_tokens": args.max_new_tokens}
 
     calibrators: dict[str, BaseCalibrator] = {
         "context-free": ContextFreeCalibrator(guard_model, token=["N/A"], model_kwargs=model_kwargs),
@@ -158,7 +158,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-path", type=str, default="results", help="Path to save the output")
     parser.add_argument("--show-plot", type=bool, default=True, help="Whether to plot the calibration curves")
     parser.add_argument("--plot-bins", type=int, default=15, help="Number of bins for calibration curve plotting")
-
+    parser.add_argument("--max-new-tokens", type=int, default=10, help="Maximum number of tokens to generate")
     return parser.parse_args()
 
 
