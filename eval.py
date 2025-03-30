@@ -10,10 +10,8 @@ import numpy as np
 from datasets import Dataset, load_dataset
 from transformers import set_seed
 
-from src.core.calibrators.batch import BatchCalibrator
-from src.core.calibrators.context_free import ContextFreeCalibrator
-from src.core.calibrators.temperature import TemperatureCalibrator
-from src.core.classifiers.guard_model import GuardModel
+from src.core.calibrators import BatchCalibrator, ContextFreeCalibrator, TemperatureCalibrator
+from src.core.classifiers import GuardModel
 from src.core.types import ClassifierOutput, PredictionOutput
 from src.evaluation.metrics import compute_metrics
 from src.evaluation.visualization import plot_calibration_curves
