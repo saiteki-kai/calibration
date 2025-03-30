@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 import torch
@@ -8,7 +8,7 @@ from transformers import GenerationConfig
 
 
 if TYPE_CHECKING:
-    from numpy import float64, int64
+    from numpy import float64
     from numpy.typing import NDArray
     from transformers import PreTrainedModel, PreTrainedTokenizer, PreTrainedTokenizerFast
     from transformers.generation import GenerateDecoderOnlyOutput
@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
 from src.core.classifiers.chat_template import load_chat_template
 from src.core.classifiers.loader import load_model
+from src.core.types import ClassifierOutput
 
 
 class GuardModel:
@@ -46,11 +47,8 @@ class GuardModel:
         self._label_token_pos = label_token_pos
 
     @torch.inference_mode()
-    def predict(
-        self,
-        data: list[dict[str, str]],
-        max_new_tokens: int = 10,
-    ) -> tuple["NDArray[int64]", "NDArray[float64]", "NDArray[float64]"]:
+    def predict(self, data: list[dict[str, str]], **kwargs: Any) -> ClassifierOutput:
+        max_new_tokens = kwargs.pop("max_new_tokens", 10)
         self._generation_config = self._prepare_generation_config(max_new_tokens)
 
         results = []
@@ -63,7 +61,7 @@ class GuardModel:
         label_probs = np.asarray(label_probs, dtype=np.float64)
         label_logits = np.asarray(label_logits, dtype=np.float64)
 
-        return pred_labels, label_probs, label_logits
+        return ClassifierOutput(pred_labels=pred_labels, label_probs=label_probs, label_logits=label_logits)
 
     def _predict(self, data: dict[str, str]) -> tuple[int, "NDArray[float64]", "NDArray[float64]"]:
         prompt = self._prepare_input(data)

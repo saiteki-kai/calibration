@@ -16,20 +16,19 @@ from sklearn.metrics import (
 
 
 if TYPE_CHECKING:
-    from numpy import float64, int64
+    from numpy import int64
     from numpy.typing import NDArray
+
+from src.core.types import PredictionOutput
 
 
 logger = logging.getLogger(__name__)
 
 
-def compute_metrics(
-    true_labels: "NDArray[int64]",
-    probs: "NDArray[float64]",
-    pred_labels: "NDArray[int64]",
-    ece_bins: int = 15,
-    verbose: bool = True,
-) -> dict[str, float]:
+def compute_metrics(true_labels: "NDArray[int64]", preds: PredictionOutput, ece_bins: int = 15) -> dict[str, float]:
+    probs = preds.label_probs
+    pred_labels = preds.pred_labels
+
     # Create ECE calculator inside the function
     ece_calculator = ECE(bins=ece_bins)
     mce_calculator = MCE(bins=ece_bins)
@@ -37,7 +36,7 @@ def compute_metrics(
     # Calculate calibration metrics
     ece_score = cast("float", ece_calculator.measure(probs, true_labels))
     mce_score = cast("float", mce_calculator.measure(probs, true_labels))
-    brier_score = brier_score_loss(true_labels, pred_labels)
+    brier_score = brier_score_loss(true_labels, probs[:, 1])
 
     # Calculate classification metrics
     f1 = f1_score(true_labels, pred_labels)
@@ -46,20 +45,23 @@ def compute_metrics(
     accuracy = accuracy_score(true_labels, pred_labels)
 
     # Calculate AUPRC
-    pr_precision, pr_recall, _ = precision_recall_curve(true_labels, pred_labels)
+    pr_precision, pr_recall, _ = precision_recall_curve(true_labels, probs[:, 1])
     auprc = auc(pr_recall, pr_precision)
 
-    if verbose:
-        logger.info("ECE: %s", ece_score)
-        logger.info("MCE: %s", mce_score)
-        logger.info("Brier: %s", brier_score)
-        logger.info("F1: %s", f1)
-        logger.info("Precision: %s", precision)
-        logger.info("Recall: %s", recall)
-        logger.info("Accuracy: %s", accuracy)
-        logger.info("AUPRC: %s", auprc)
-        logger.info("\nClassification Report:")
-        logger.info(classification_report(true_labels, pred_labels))
+    logger.info("Calibration Metrics:")
+    logger.info("ECE: %s", ece_score)
+    logger.info("MCE: %s", mce_score)
+    logger.info("Brier: %s", brier_score)
+
+    logger.info("Classification Metrics:")
+    logger.info("F1: %s", f1)
+    logger.info("Precision: %s", precision)
+    logger.info("Recall: %s", recall)
+    logger.info("Accuracy: %s", accuracy)
+    logger.info("AUPRC: %s", auprc)
+
+    logger.info("\nClassification Report:")
+    logger.info(classification_report(true_labels, pred_labels))
 
     return {
         "ece": ece_score,

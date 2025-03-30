@@ -7,10 +7,11 @@ from tqdm import tqdm
 
 from src.core.calibrators.calibration import calibrate_py
 from src.core.classifiers.guard_model import GuardModel
+from src.core.types import CalibratorOutput
 
 
 if TYPE_CHECKING:
-    from numpy import float64, int64
+    from numpy import float64
     from numpy.typing import NDArray
 
 
@@ -24,7 +25,7 @@ class BaseCalibrator(ABC):
         self._calibration_mode = "diagonal"
         self._model_kwargs = model_kwargs or {}
 
-    def calibrate(self, probs: "NDArray[float64]") -> tuple["NDArray[float64]", "NDArray[int64]"]:
+    def calibrate(self, probs: "NDArray[float64]") -> CalibratorOutput:
         prior = self._compute_prior()
 
         cal_probs = []
@@ -36,9 +37,9 @@ class BaseCalibrator(ABC):
             pred_label = int(np.argmax(cal_prob.reshape(-1)))
             cal_pred_labels.append(pred_label)
 
-        return (
-            np.array(cal_probs).squeeze(),
-            np.array(cal_pred_labels).squeeze(),
+        return CalibratorOutput(
+            label_probs=np.array(cal_probs).squeeze(),
+            pred_labels=np.array(cal_pred_labels).squeeze(),
         )
 
     @abstractmethod

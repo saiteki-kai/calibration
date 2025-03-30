@@ -6,6 +6,8 @@ import seaborn as sns
 
 from sklearn.calibration import calibration_curve
 
+from src.core.types import PredictionOutput
+
 
 if TYPE_CHECKING:
     from matplotlib.figure import Figure
@@ -16,11 +18,10 @@ if TYPE_CHECKING:
 def plot_calibration_curves(
     true_labels: "NDArray[int64]",
     label_probs: "NDArray[float64]",
-    cal_results: list[tuple[str, "NDArray[float64]", "NDArray[float64]"]],
+    cal_results: dict[str, PredictionOutput],
     n_bins: int = 20,
     output_path: Path | str | None = None,
     show_plot: bool = True,
-    title: str = "Calibration Curves Comparison",
 ) -> "Figure":
     sns.set_style("whitegrid")
     sns.set_context("paper", font_scale=1.5)
@@ -37,8 +38,8 @@ def plot_calibration_curves(
     # Calibrated model lines
     colors = sns.color_palette("husl", len(cal_results))
 
-    for (method_name, cal_probs, _cal_pred_labels), color in zip(cal_results, colors):
-        prob_true, prob_pred = calibration_curve(true_labels, cal_probs[:, 1], n_bins=n_bins)
+    for (method_name, cal_output), color in zip(cal_results.items(), colors):
+        prob_true, prob_pred = calibration_curve(true_labels, cal_output.label_probs[:, 1], n_bins=n_bins)
 
         sns.lineplot(
             x=prob_pred,
@@ -51,7 +52,6 @@ def plot_calibration_curves(
             color=color,
         )
 
-    ax.set_title(title)
     ax.set_xlabel("Predicted Probability", labelpad=10)
     ax.set_ylabel("True Probability", labelpad=10)
 

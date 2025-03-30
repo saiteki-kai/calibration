@@ -14,8 +14,10 @@ from src.core.calibrators.batch import BatchCalibrator
 from src.core.calibrators.context_free import ContextFreeCalibrator
 from src.core.calibrators.temperature import TemperatureCalibrator
 from src.core.classifiers.guard_model import GuardModel
+from src.core.types import ClassifierOutput, PredictionOutput
 from src.evaluation.metrics import compute_metrics
 from src.evaluation.visualization import plot_calibration_curves
+from utils import load_predictions, save_predictions
 
 
 if TYPE_CHECKING:
@@ -45,21 +47,21 @@ def main(args: argparse.Namespace) -> None:
 
     print(SEPARATOR)
     print("Uncalibrated\n")
-    pred_labels, label_probs, label_logits = compute_predictions(guard_model, dataset, output_path)
+    output = compute_predictions(guard_model, dataset, output_path)
 
     # Compute metrics for uncalibrated results
     metrics = {}
-    metrics["uncalibrated"] = compute_metrics(true_labels, label_probs, pred_labels, ece_bins=args.ece_bins)
+    metrics["uncalibrated"] = compute_metrics(true_labels, output, ece_bins=args.ece_bins)
 
     model_kwargs = {"max_new_tokens": 10}
 
     calibrators: dict[str, BaseCalibrator] = {
         "context-free": ContextFreeCalibrator(guard_model, token=["N/A"], model_kwargs=model_kwargs),
-        "batch": BatchCalibrator(guard_model, label_probs, model_kwargs=model_kwargs),
-        "temperature": TemperatureCalibrator(guard_model, temperature=5.0, model_kwargs=model_kwargs),
+        "batch": BatchCalibrator(guard_model, output.label_probs, model_kwargs=model_kwargs),
+        "temperature": TemperatureCalibrator(guard_model, temperature=5.6, model_kwargs=model_kwargs),
     }
 
-    calibrated_results = []
+    calibrated_results: dict[str, PredictionOutput] = {}
 
     for method_name, calibrator in calibrators.items():
         print(SEPARATOR)
@@ -67,13 +69,12 @@ def main(args: argparse.Namespace) -> None:
 
         # Calibrate predictions using appropriate input
         if method_name == "temperature":
-            cal_probs, cal_pred_labels = calibrator.calibrate(label_logits)
+            cal_output = calibrator.calibrate(output.label_logits)
         else:
-            cal_probs, cal_pred_labels = calibrator.calibrate(label_probs)
+            cal_output = calibrator.calibrate(output.label_probs)
 
-        calibrated_results.append((method_name, cal_probs, cal_pred_labels))
-
-        metrics[method_name] = compute_metrics(true_labels, cal_probs, cal_pred_labels, ece_bins=args.ece_bins)
+        calibrated_results[method_name] = cal_output
+        metrics[method_name] = compute_metrics(true_labels, cal_output, ece_bins=args.ece_bins)
 
     print(SEPARATOR)
 
@@ -83,7 +84,11 @@ def main(args: argparse.Namespace) -> None:
 
     # Save calibrated results
     calibrated_predictions = Dataset.from_dict(
-        dict(zip(["method", "calibrated_probs", "calibrated_labels"], zip(*calibrated_results)))
+        {
+            "method": list(calibrated_results.keys()),
+            "calibrated_probs": [result.label_probs for result in calibrated_results.values()],
+            "calibrated_labels": [result.pred_labels for result in calibrated_results.values()],
+        }
     )
     calibrated_predictions.to_json(output_path / "calibrated_predictions.json")
 
@@ -93,30 +98,38 @@ def main(args: argparse.Namespace) -> None:
     print_metrics_summary(metrics)
 
     print(SEPARATOR)
+
+    # Set plot directory
+    plots_dir = output_path / "plots"
+    plots_dir.mkdir(parents=True, exist_ok=True)
+
+    # model_title = args.model.split("/")[-1] if "/" in args.model else args.model
+    # dataset_title = args.dataset_name.split("/")[-1] if "/" in args.dataset_name else args.dataset_name
+
+    # Plot calibration curves
     plot_calibration_curves(
         true_labels,
-        label_probs,
+        output.label_probs,
         calibrated_results,
-        output_path=output_path / "plots",
+        output_path=plots_dir,
         show_plot=args.show_plot,
         n_bins=args.plot_bins,
-        title=args.model + "\n" + args.dataset_name,
     )
 
 
-def compute_predictions(
-    guard_model: GuardModel,
-    dataset: Dataset,
-    output_path: Path,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    pred_labels, label_probs, label_logits = guard_model.predict(dataset.to_list())
+def compute_predictions(guard_model: GuardModel, dataset: Dataset, output_path: Path) -> ClassifierOutput:
+    pred_output_path = Path(output_path) / "evaluation" / "predictions.npz"
+    pred_output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    predictions = Dataset.from_dict(
-        {"label_probs": label_probs, "pred_labels": pred_labels, "label_logits": label_logits}
-    )
-    predictions.to_json(output_path / "predictions.json")
+    if pred_output_path.exists():
+        output = load_predictions(pred_output_path)
+        print(f"Loaded predictions from {pred_output_path}")
+    else:
+        output = guard_model.predict(dataset.to_list())
+        save_predictions(output, pred_output_path)
+        print(f"Saved predictions to {pred_output_path}")
 
-    return pred_labels, label_probs, label_logits
+    return output
 
 
 def print_metrics_summary(metrics: dict[str, dict[str, float]]) -> None:
@@ -146,10 +159,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--taxonomy", type=str, default="llama-guard-3", help="Taxonomy used in chat template")
     parser.add_argument("--descriptions", type=bool, default=False, help="Whether to use safety descriptions")
     parser.add_argument("--ece-bins", type=int, default=15, help="Number of bins for ECE calculation")
-    parser.add_argument("--verbose", type=bool, default=True, help="Whether to print verbose output")
     parser.add_argument("--output-path", type=str, default="results", help="Path to save the output")
     parser.add_argument("--show-plot", type=bool, default=True, help="Whether to plot the calibration curves")
-    parser.add_argument("--plot-bins", type=int, default=20, help="Number of bins for calibration curve plotting")
+    parser.add_argument("--plot-bins", type=int, default=15, help="Number of bins for calibration curve plotting")
 
     return parser.parse_args()
 

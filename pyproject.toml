@@ -18,10 +18,11 @@ show-fixes = true
 
 [tool.ruff.lint]
 select = [
-    "ERA",
+    #"ERA",
     "ANN",
     "S",
     "A",
+    #"D",
     "C4",
     "EM",
     "ICN",
@@ -49,7 +50,10 @@ select = [
     "RUF",
     "TRY",
 ]
-ignore = ["N806"]
+ignore = ["N806", "D100", "D104", "ANN401"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.ruff.lint.isort]
 lines-after-imports = 2
