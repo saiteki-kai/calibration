@@ -205,11 +205,14 @@ def main(args: argparse.Namespace) -> None:
     set_seed(args.seed)
 
     # Load the dataset
-    dataset = load_dataset(args.dataset_name, split="330k_train")
+    dataset = load_dataset(args.dataset_name, split=args.split)
     dataset = cast("Dataset", dataset)
 
-    # Create a validation set (10% of the training data)
-    validation_set = dataset.train_test_split(test_size=0.01, seed=args.seed)["test"]
+    if "train" in args.split:
+        # Create a validation set (10% of the training data)
+        validation_set = dataset.train_test_split(test_size=0.01, seed=args.seed)["test"]
+    else:
+        validation_set = dataset
 
     guard_model = GuardModel(args.model, taxonomy=args.taxonomy, descriptions=args.descriptions)
     model_kwargs = {"max_new_tokens": 10}
@@ -250,6 +253,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
     parser.add_argument("--model", type=str, default="meta-llama/Llama-Guard-3-1B", help="Model to use")
     parser.add_argument("--dataset-name", type=str, default="PKU-Alignment/Beavertails", help="Dataset name")
+    parser.add_argument("--split", type=str, default="330k_train", help="Split to use")
     parser.add_argument("--taxonomy", type=str, default="llama-guard-3", help="Taxonomy used in chat template")
     parser.add_argument("--descriptions", type=bool, default=False, help="Whether to use safety descriptions")
     parser.add_argument("--ece-bins", type=int, default=15, help="Number of bins for ECE calculation")
