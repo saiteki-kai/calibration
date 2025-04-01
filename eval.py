@@ -18,7 +18,7 @@ from src.evaluation.visualization import plot_calibration_curves
 
 
 if TYPE_CHECKING:
-    from src.core.calibrators.base import BaseCalibrator
+    from src.core.calibrators import BaseCalibrator
 
 SEPARATOR = "-" * os.get_terminal_size().columns
 
@@ -87,7 +87,7 @@ def main(args: argparse.Namespace) -> None:
     print(SEPARATOR)
 
     # Set plot directory
-    plots_dir = output_path / "plots"
+    plots_dir = output_path / "evaluation" / "plots"
     plots_dir.mkdir(parents=True, exist_ok=True)
 
     # model_title = args.model.split("/")[-1] if "/" in args.model else args.model
