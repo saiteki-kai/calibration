@@ -26,6 +26,8 @@ logger = logging.getLogger(__name__)
 
 
 def compute_metrics(true_labels: "NDArray[int64]", preds: PredictionOutput, ece_bins: int = 15) -> dict[str, float]:
+    # NOTE: works for binary classification only and assumes that the positive class is the second class (index 1)
+
     probs = preds.label_probs
     pred_labels = preds.pred_labels
 
