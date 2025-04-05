@@ -8,15 +8,15 @@ import numpy as np
 
 from datasets import Dataset, load_dataset
 
+from src.core.types import CalibratorOutput, ClassifierOutput, PredictionOutput
+from src.evaluation.visualization import calibration_curve, confidence_histogram, reliability_diagram
+from src.evaluation.visualization.utils import save_figure
+
 
 if TYPE_CHECKING:
     from matplotlib.figure import Figure
     from numpy import int64
     from numpy.typing import NDArray
-
-from src.core.types import CalibratorOutput, ClassifierOutput, PredictionOutput
-from src.evaluation.visualization import calibration_curve, confidence_histogram, reliability_diagram
-from src.evaluation.visualization.utils import save_figure
 
 
 def compare_uncalibrated_model_reliability_diagram_and_confidence_histogram(

@@ -6,17 +6,16 @@ import torch
 from tqdm import tqdm
 from transformers import GenerationConfig
 
+from src.core.classifiers.chat_template import load_chat_template
+from src.core.classifiers.loader import load_model
+from src.core.types import ClassifierOutput
+
 
 if TYPE_CHECKING:
     from numpy import float64
     from numpy.typing import NDArray
     from transformers import PreTrainedModel, PreTrainedTokenizer, PreTrainedTokenizerFast
     from transformers.generation import GenerateDecoderOnlyOutput
-
-
-from src.core.classifiers.chat_template import load_chat_template
-from src.core.classifiers.loader import load_model
-from src.core.types import ClassifierOutput
 
 
 class GuardModel:

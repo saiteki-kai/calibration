@@ -14,12 +14,12 @@ from sklearn.metrics import (
     recall_score,
 )
 
+from src.core.types import PredictionOutput
+
 
 if TYPE_CHECKING:
     from numpy import int64
     from numpy.typing import NDArray
-
-from src.core.types import PredictionOutput
 
 
 logger = logging.getLogger(__name__)
