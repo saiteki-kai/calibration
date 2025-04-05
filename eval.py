@@ -14,7 +14,6 @@ from src.core.calibrators import BatchCalibrator, ContextFreeCalibrator, Tempera
 from src.core.classifiers import GuardModel
 from src.core.types import ClassifierOutput, PredictionOutput
 from src.evaluation.metrics import compute_metrics, print_summary
-from src.evaluation.visualization import plot_calibration_curves
 
 
 if TYPE_CHECKING:
@@ -58,7 +57,7 @@ def main(args: argparse.Namespace) -> None:
         "temperature": TemperatureCalibrator(guard_model, temperature=5.6, model_kwargs=model_kwargs),
     }
 
-    calibrated_results: dict[str, PredictionOutput] = {}
+    calibrated_outputs: dict[str, PredictionOutput] = {}
 
     for method_name, calibrator in calibrators.items():
         print(SEPARATOR)
@@ -66,7 +65,7 @@ def main(args: argparse.Namespace) -> None:
 
         cal_output = calibrator.calibrate(output)
 
-        calibrated_results[method_name] = cal_output
+        calibrated_outputs[method_name] = cal_output
         metrics[method_name] = compute_metrics(true_labels, cal_output, ece_bins=args.ece_bins)
 
     print(SEPARATOR)
@@ -76,32 +75,11 @@ def main(args: argparse.Namespace) -> None:
         json.dump(metrics, f, indent=4)
 
     # Save calibrated results
-    for method_name, cal_output in calibrated_results.items():
+    for method_name, cal_output in calibrated_outputs.items():
         cal_output.to_npz(output_path / "evaluation" / f"{method_name}_predictions.npz")
-
-    # Show metrics summary and calibration curves
 
     print(SEPARATOR)
     print_summary(metrics)
-
-    print(SEPARATOR)
-
-    # Set plot directory
-    plots_dir = output_path / "evaluation" / "plots"
-    plots_dir.mkdir(parents=True, exist_ok=True)
-
-    # model_title = args.model.split("/")[-1] if "/" in args.model else args.model
-    # dataset_title = args.dataset_name.split("/")[-1] if "/" in args.dataset_name else args.dataset_name
-
-    # Plot calibration curves
-    plot_calibration_curves(
-        true_labels,
-        output.label_probs,
-        calibrated_results,
-        output_path=plots_dir,
-        show_plot=args.show_plot,
-        n_bins=args.plot_bins,
-    )
 
 
 def compute_predictions(guard_model: GuardModel, dataset: Dataset, output_path: Path) -> ClassifierOutput:
