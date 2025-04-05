@@ -15,9 +15,11 @@ if TYPE_CHECKING:
 class TemperatureCalibrator(BaseCalibrator):
     def __init__(self, guard_model: GuardModel, temperature: float, model_kwargs: dict[str, Any] | None = None) -> None:
         super().__init__(guard_model, model_kwargs)
+
         if temperature <= 0:
             msg = "Temperature must be positive, got {0}".format(temperature)
             raise ValueError(msg)
+
         self.T = temperature
 
     @override
@@ -26,6 +28,9 @@ class TemperatureCalibrator(BaseCalibrator):
         pred_labels = np.argmax(calibrated_probs, axis=1)
 
         return CalibratorOutput(label_probs=calibrated_probs, pred_labels=pred_labels)
+
+    def _calibrate_prob(self, _prob: "NDArray[float64]", _prior: "NDArray[float64]") -> "NDArray[float64]":
+        return np.empty((), dtype=np.float64)
 
     def _compute_prior(self) -> "NDArray[float64]":
         return np.empty((), dtype=np.float64)

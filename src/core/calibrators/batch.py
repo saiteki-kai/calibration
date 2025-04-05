@@ -1,6 +1,6 @@
 import logging
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 import numpy as np
 
@@ -26,8 +26,18 @@ class BatchCalibrator(BaseCalibrator):
         model_kwargs: dict[str, Any] | None = None,
     ) -> None:
         super().__init__(guard_model, model_kwargs)
-        self._calibration_mode = "identity"
         self._probs = probs
+
+    @override
+    def _calibrate_prob(self, prob: "NDArray[float64]", prior: "NDArray[float64]") -> "NDArray[float64]":
+        num_classes = prob.shape[0]
+
+        W = np.identity(num_classes)
+        b = -1 * np.log(prior)
+        cal_prob = np.matmul(W, np.log(prob + 10e-6)) + b
+        cal_prob = np.exp(cal_prob)
+
+        return cal_prob / np.sum(cal_prob)
 
     def _compute_prior(self) -> "NDArray[float64]":
         avg_probs = np.mean(self._probs, axis=0)

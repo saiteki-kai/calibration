@@ -1,6 +1,6 @@
 import logging
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 import numpy as np
 
@@ -26,10 +26,20 @@ class ContextFreeCalibrator(BaseCalibrator):
         model_kwargs: dict[str, Any] | None = None,
     ) -> None:
         super().__init__(guard_model, model_kwargs)
-        self._calibration_mode = "diagonal"
+
         if token is None:
             token = ["N/A", " ", "[MASK]"]
+
         self._token = [token] if isinstance(token, str) else token
+
+    @override
+    def _calibrate_prob(self, prob: "NDArray[float64]", prior: "NDArray[float64]") -> "NDArray[float64]":
+        num_classes = prob.shape[0]
+
+        W = np.linalg.inv(np.identity(num_classes) * prior)
+        cal_prob = np.matmul(W, prob)
+
+        return cal_prob / np.sum(cal_prob)
 
     def _compute_prior(self) -> "NDArray[float64]":
         data = [{"prompt": token, "response": token} for token in self._token]
