@@ -100,8 +100,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--descriptions", type=bool, default=False, help="Whether to use safety descriptions")
     parser.add_argument("--ece-bins", type=int, default=15, help="Number of bins for ECE calculation")
     parser.add_argument("--output-path", type=str, default="results", help="Path to save the output")
-    parser.add_argument("--show-plot", type=bool, default=True, help="Whether to plot the calibration curves")
-    parser.add_argument("--plot-bins", type=int, default=15, help="Number of bins for calibration curve plotting")
     parser.add_argument("--max-new-tokens", type=int, default=10, help="Maximum number of tokens to generate")
     return parser.parse_args()
 
