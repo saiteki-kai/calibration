@@ -12,12 +12,13 @@ from transformers import set_seed
 
 from src.core.calibrators import BatchCalibrator, ContextFreeCalibrator, TemperatureCalibrator
 from src.core.classifiers import GuardModel
-from src.core.types import ClassifierOutput, PredictionOutput
+from src.core.utils import compute_or_load_predictions
 from src.evaluation.metrics import compute_metrics, print_summary
 
 
 if TYPE_CHECKING:
     from src.core.calibrators import BaseCalibrator
+    from src.core.types import CalibratorOutput
 
 SEPARATOR = "-" * os.get_terminal_size().columns
 
@@ -43,13 +44,19 @@ def main(args: argparse.Namespace) -> None:
 
     print(SEPARATOR)
     print("Uncalibrated\n")
-    output = compute_predictions(guard_model, dataset, output_path)
+
+    model_kwargs = {"max_new_tokens": args.max_new_tokens}
+
+    output = compute_or_load_predictions(
+        guard_model,
+        dataset,
+        output_path / "evaluation" / "predictions.npz",
+        model_kwargs=model_kwargs,
+    )
 
     # Compute metrics for uncalibrated results
     metrics = {}
     metrics["uncalibrated"] = compute_metrics(true_labels, output, ece_bins=args.ece_bins)
-
-    model_kwargs = {"max_new_tokens": args.max_new_tokens}
 
     calibrators: dict[str, BaseCalibrator] = {
         "context-free": ContextFreeCalibrator(guard_model, token=["N/A"], model_kwargs=model_kwargs),
@@ -57,7 +64,7 @@ def main(args: argparse.Namespace) -> None:
         "temperature": TemperatureCalibrator(guard_model, temperature=5.6, model_kwargs=model_kwargs),
     }
 
-    calibrated_outputs: dict[str, PredictionOutput] = {}
+    calibrated_outputs: dict[str, CalibratorOutput] = {}
 
     for method_name, calibrator in calibrators.items():
         print(SEPARATOR)
@@ -80,21 +87,6 @@ def main(args: argparse.Namespace) -> None:
 
     print(SEPARATOR)
     print_summary(metrics)
-
-
-def compute_predictions(guard_model: GuardModel, dataset: Dataset, output_path: Path) -> ClassifierOutput:
-    pred_output_path = Path(output_path) / "evaluation" / "predictions.npz"
-    pred_output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    if pred_output_path.exists():
-        output = ClassifierOutput.from_npz(pred_output_path)
-        print(f"Loaded predictions from {pred_output_path}")
-    else:
-        output = guard_model.predict(dataset.to_list())
-        output.to_npz(pred_output_path)
-        print(f"Saved predictions to {pred_output_path}")
-
-    return output
 
 
 def parse_args() -> argparse.Namespace:

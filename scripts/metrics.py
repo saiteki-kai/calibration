@@ -16,7 +16,7 @@ def generate_metrics_table(
     filepath = Path("results/comparison/metrics/metrics.tex")
     filepath.parent.mkdir(parents=True, exist_ok=True)
 
-    with Path(filepath).open("w", encoding="utf-8") as tex_file:
+    with filepath.open("w", encoding="utf-8") as tex_file:
         tex_file.write("\\documentclass{standalone}\n")
         tex_file.write("\\usepackage{booktabs}\n")
         tex_file.write("\\begin{document}\n")

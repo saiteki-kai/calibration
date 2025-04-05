@@ -1,9 +1,11 @@
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
 
 
 if TYPE_CHECKING:
+    from matplotlib.figure import Figure
     from numpy import float64, int64
     from numpy.typing import NDArray
 
@@ -28,3 +30,11 @@ def compute_calibration_curve(
     prob_pred[nonzero] = bin_sums[nonzero] / bin_total[nonzero]
 
     return prob_true, prob_pred, bins
+
+
+def save_figure(fig: "Figure", path: Path | str, filename: str) -> None:
+    filepath = Path(path) / filename
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+
+    fig.savefig(str(filepath.with_suffix(".pdf")), dpi=300, bbox_inches="tight")
+    fig.savefig(str(filepath.with_suffix(".png")), dpi=300, bbox_inches="tight")

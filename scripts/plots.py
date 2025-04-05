@@ -1,7 +1,7 @@
 import argparse
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional, cast
+from typing import TYPE_CHECKING, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
 from src.core.types import CalibratorOutput, ClassifierOutput, PredictionOutput
 from src.evaluation.visualization import calibration_curve, confidence_histogram, reliability_diagram
+from src.evaluation.visualization.utils import save_figure
 
 
 def compare_uncalibrated_model_reliability_diagram_and_confidence_histogram(
@@ -123,33 +124,12 @@ def compare_calibrated_model_curve(
     return fig
 
 
-def load_data(
-    dataset_name: str = "PKU-Alignment/Beavertails",
-    split: str = "330k_test",
-    sample_size: Optional[int] = None,
-) -> tuple[Dataset, "NDArray[int64]"]:
-    dataset = load_dataset(dataset_name, split=split)
-    dataset = cast("Dataset", dataset)
-
-    if sample_size is not None:
-        dataset = dataset.select(range(sample_size))
-
-    true_labels = np.asarray([0 if x["is_safe"] else 1 for x in dataset.to_list()])
-
-    return dataset, true_labels
-
-
-def get_model_name(model: str) -> str:
-    return model.split("__")[-1] if "__" in model else model
-
-
 def load_model_predictions(
-    model: str,
+    model_name: str,
     taxonomy: str,
     methods: list[str],
 ) -> tuple[str, ClassifierOutput, dict[str, CalibratorOutput]]:
-    model_dir = Path(f"results/{model}/{taxonomy}")
-    model_name = get_model_name(model)
+    model_dir = Path(f"results/{model_name.replace('/', '__')}/{taxonomy}")
 
     # Load uncalibrated predictions
     uncalibrated_output = ClassifierOutput.from_npz(model_dir / "evaluation" / "predictions.npz")
@@ -163,16 +143,10 @@ def load_model_predictions(
     return model_name, uncalibrated_output, calibrated_outputs
 
 
-def save_figure(fig: "Figure", path: Path | str, filename: str) -> None:
-    filepath = Path(path) / filename
-    filepath.parent.mkdir(parents=True, exist_ok=True)
-
-    fig.savefig(str(filepath.with_suffix(".pdf")), dpi=300, bbox_inches="tight")
-    fig.savefig(str(filepath.with_suffix(".png")), dpi=300, bbox_inches="tight")
-
-
 def main(args: argparse.Namespace) -> None:
-    models = ["meta-llama__Llama-Guard-3-1B", "meta-llama__Llama-Guard-3-1B"]
+    models = ["meta-llama/Llama-Guard-3-1B", "meta-llama/Llama-Guard-3-1B"]
+    dataset_name = "PKU-Alignment/Beavertails"
+    split = "330k_test"
     taxonomy = "beavertails"
     sample_size = 2000
     plot_bins = 10
@@ -182,7 +156,13 @@ def main(args: argparse.Namespace) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Load dataset
-    _, true_labels = load_data(dataset_name="PKU-Alignment/Beavertails", split="330k_test", sample_size=sample_size)
+    dataset = load_dataset(dataset_name, split=split)
+    dataset = cast("Dataset", dataset)
+
+    if sample_size is not None:
+        dataset = dataset.select(range(sample_size))
+
+    true_labels = np.asarray([0 if x["is_safe"] else 1 for x in dataset.to_list()])
 
     outputs = {}
     for i, model in enumerate(models):

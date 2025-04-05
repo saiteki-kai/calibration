@@ -15,7 +15,9 @@ from transformers import set_seed
 from src.core.calibrators import BatchCalibrator, TemperatureCalibrator
 from src.core.classifiers import GuardModel
 from src.core.types import ClassifierOutput
+from src.core.utils import compute_or_load_predictions
 from src.evaluation.metrics import compute_metrics
+from src.evaluation.visualization.utils import save_figure
 
 
 def tune_parameter(
@@ -83,21 +85,24 @@ def plot_metrics(metrics_history: dict[str, list[float]], param_name: str, outpu
     sns.set_context("paper", font_scale=1.5)
 
     df_metrics = pd.DataFrame(metrics_history)
+    best_param_value = df_metrics.loc[df_metrics["nll"].idxmin(), param_name]
 
     fig, axes = plt.subplots(3, 1, figsize=(12, 14), sharex=True)
 
     # NLL Plot
-    sns.lineplot(
-        data=df_metrics,
-        x=param_name,
-        y="nll",
-        ax=axes[0],
-    )
-
-    # Add best parameter vertical line
-    best_param_value = df_metrics.loc[df_metrics["nll"].idxmin(), param_name]
+    sns.lineplot(data=df_metrics, x=param_name, y="nll", ax=axes[0])
     axes[0].axvline(
         x=best_param_value, color="red", linestyle="--", alpha=0.7, label=f"Best {param_name}={best_param_value:.3f}"
+    )
+
+    # Add text annotation for the best value
+    best_nll = df_metrics["nll"].min()
+    axes[0].annotate(
+        f"Best NLL: {best_nll:.4f}",
+        xy=(best_param_value, best_nll),
+        xytext=(10, 15),
+        textcoords="offset points",
+        bbox={"boxstyle": "round,pad=0.3", "fc": "yellow", "alpha": 0.3},
     )
 
     # Calibration Metrics Plot
@@ -112,37 +117,20 @@ def plot_metrics(metrics_history: dict[str, list[float]], param_name: str, outpu
         y="Value",
         hue="Metric",
         style="Metric",
-        # markers=True,
         dashes=False,
         palette="husl",
         linewidth=2,
         markersize=8,
-        # marker="o",
-        # alpha=0.8,
         ax=axes[1],
     )
 
-    # Add best parameter vertical line
-    best_param_value = df_metrics.loc[df_metrics["nll"].idxmin(), param_name]
     axes[1].axvline(
         x=best_param_value, color="red", linestyle="--", alpha=0.7, label=f"Best {param_name}={best_param_value:.3f}"
     )
-
     axes[1].set_title(f"Calibration Metrics vs. {param_name.capitalize()}")
     axes[1].set_ylabel("Error Value")
     axes[1].legend(title="Metric")
     axes[1].grid(True, linestyle="--", alpha=0.7)
-
-    # Add text annotation for the best value
-    best_nll = df_metrics["nll"].min()
-    axes[0].annotate(
-        f"Best NLL: {best_nll:.4f}",
-        xy=(best_param_value, best_nll),
-        xytext=(10, 15),
-        textcoords="offset points",
-        # arrowprops={"arrowstyle": "->", "color": "black", "alpha": 0.7},
-        bbox={"boxstyle": "round,pad=0.3", "fc": "yellow", "alpha": 0.3},
-    )
 
     # Classification Metrics Plot
     classification_metrics = ["accuracy", "f1", "precision", "recall"]
@@ -156,13 +144,10 @@ def plot_metrics(metrics_history: dict[str, list[float]], param_name: str, outpu
         y="Value",
         hue="Metric",
         style="Metric",
-        # markers=True,
         dashes=False,
         palette="husl",
         linewidth=2,
         markersize=8,
-        # marker="s",
-        # alpha=0.8,
         ax=axes[2],
     )
 
@@ -177,27 +162,18 @@ def plot_metrics(metrics_history: dict[str, list[float]], param_name: str, outpu
     axes[2].legend(title="Metric")
     axes[2].grid(True, linestyle="--", alpha=0.7)
 
-    # Add text annotations for values at the best parameter
-
+    # Add scatter points at best parameter value
     idx = np.argmin(np.abs(np.array(df_metrics[param_name]) - best_param_value))
-    y_val = df_metrics["nll"].iloc[idx]
-    axes[0].scatter([best_param_value], [y_val], color="red", zorder=5, s=50)
+    axes[0].scatter([best_param_value], [df_metrics["nll"].iloc[idx]], color="red", zorder=5, s=50)
 
     for metric in calibration_metrics:
-        y_val = df_metrics[metric].iloc[idx]
-        axes[1].scatter([best_param_value], [y_val], color="red", zorder=5, s=50)
+        axes[1].scatter([best_param_value], [df_metrics[metric].iloc[idx]], color="red", zorder=5, s=50)
 
     for metric in classification_metrics:
-        y_val = df_metrics[metric].iloc[idx]
-        axes[2].scatter([best_param_value], [y_val], color="red", zorder=5, s=50)
+        axes[2].scatter([best_param_value], [df_metrics[metric].iloc[idx]], color="red", zorder=5, s=50)
 
     plt.tight_layout(rect=[0, 0, 1, 0.95])
-
-    output_path.mkdir(parents=True, exist_ok=True)
-    plt.savefig(output_path / f"{param_name}_tuning_metrics.png", dpi=300, bbox_inches="tight")
-    plt.savefig(output_path / f"{param_name}_tuning_metrics.pdf", dpi=300, bbox_inches="tight")
-
-    plt.close("all")
+    save_figure(fig, output_path, f"{param_name}_tuning_metrics")
 
 
 def main(args: argparse.Namespace) -> None:
@@ -218,16 +194,12 @@ def main(args: argparse.Namespace) -> None:
     model_kwargs = {"max_new_tokens": 10}
 
     # Load or Compute Predictions
-    pred_output_path = Path(args.output_path) / "tuning" / "predictions.npz"
-    pred_output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    if pred_output_path.exists():
-        pred_output = ClassifierOutput.from_npz(pred_output_path)
-        print(f"Loaded predictions from {pred_output_path}")
-    else:
-        pred_output = guard_model.predict(validation_set.to_list(), model_kwargs=model_kwargs)
-        pred_output.to_npz(pred_output_path)
-        print(f"Saved predictions to {pred_output_path}")
+    pred_output = compute_or_load_predictions(
+        guard_model,
+        validation_set,
+        Path(args.output_path) / "tuning" / "predictions.npz",
+        model_kwargs=model_kwargs,
+    )
 
     # Tune temperature
     best_temperature, best_temp_metrics, temp_metrics_history = tune_parameter(
