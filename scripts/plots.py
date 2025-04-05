@@ -18,6 +18,13 @@ if TYPE_CHECKING:
     from numpy import int64
     from numpy.typing import NDArray
 
+METHODS_NAMES = {
+    "uncalibrated_output": "Uncalibrated",
+    "batch": "Batch Calibration",
+    "context-free": "Context-free Calibration",
+    "temperature": "Temperature Scaling",
+}
+
 
 def compare_uncalibrated_model_reliability_diagram_and_confidence_histogram(
     outputs: dict[str, dict[str, PredictionOutput]],
@@ -35,17 +42,16 @@ def compare_uncalibrated_model_reliability_diagram_and_confidence_histogram(
             ax=axes[0, i],
             pred_probs=uncalibrated_output.label_probs[:, 1],
             n_bins=n_bins * 2,
+            title=model,
         )
 
         reliability_diagram(
+            ax=axes[1, i],
             true_labels=true_labels,
             pred_probs=uncalibrated_output.label_probs[:, 1],
             n_bins=n_bins,
-            ax=axes[1, i],
+            title="",
         )
-
-        axes[0, i].set_title(model)
-        axes[1, i].set_title(model)
 
     fig.tight_layout()
 
@@ -62,11 +68,6 @@ def compare_calibrated_model_reliability_diagram(
     n_bins: int,
     output_dir: Path | str | None = None,
 ) -> "Figure":
-    outputs = {
-        "uncalibrated_output": outputs["uncalibrated_output"],
-        **cast("dict[str, PredictionOutput]", outputs["calibrated_outputs"]),
-    }
-
     fig_name = f"Reliability Diagram and Confidence Distribution - {model_name}"
     fig, axes = plt.subplots(2, len(outputs), figsize=(20, 10), num=fig_name)
 
@@ -75,6 +76,7 @@ def compare_calibrated_model_reliability_diagram(
             ax=axes[0, i],
             pred_probs=output.label_probs[:, 1],
             n_bins=n_bins * 2,
+            title=METHODS_NAMES[method],
         )
 
         reliability_diagram(
@@ -82,10 +84,8 @@ def compare_calibrated_model_reliability_diagram(
             pred_probs=output.label_probs[:, 1],
             n_bins=n_bins,
             ax=axes[1, i],
+            title="",
         )
-
-        axes[0, i].set_title(method)
-        axes[1, i].set_title(method)
 
     fig.tight_layout()
 
@@ -102,16 +102,11 @@ def compare_calibrated_model_curve(
     n_bins: int,
     output_dir: Path | str | None = None,
 ) -> "Figure":
-    outputs = {
-        "uncalibrated_output": outputs["uncalibrated_output"],
-        **cast("dict[str, PredictionOutput]", outputs["calibrated_outputs"]),
-    }
-
     fig_name = f"Calibration Curve - {model_name}"
     fig, ax = plt.subplots(figsize=(20, 10), num=fig_name)
 
-    pred_probs = {method: output.label_probs[:, 1] for (method, output) in outputs.items()}
-    labels = list(outputs.keys())
+    pred_probs = {METHODS_NAMES[method]: output.label_probs[:, 1] for (method, output) in outputs.items()}
+    labels = list(pred_probs.keys())
     probs = list(pred_probs.values())
 
     calibration_curve(true_labels=true_labels, pred_probs=probs, ax=ax, n_bins=n_bins, label=labels)
@@ -144,40 +139,30 @@ def load_model_predictions(
 
 
 def main(args: argparse.Namespace) -> None:
-    models = ["meta-llama/Llama-Guard-3-1B", "meta-llama/Llama-Guard-3-1B"]
-    dataset_name = "PKU-Alignment/Beavertails"
-    split = "330k_test"
-    taxonomy = "beavertails"
-    sample_size = 2000
-    plot_bins = 10
-
     # Set up output directory
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Load dataset
-    dataset = load_dataset(dataset_name, split=split)
+    dataset = load_dataset(args.dataset_name, split=args.split)
     dataset = cast("Dataset", dataset)
 
-    if sample_size is not None:
-        dataset = dataset.select(range(sample_size))
+    if args.sample_size is not None:
+        dataset = dataset.select(range(args.sample_size))
 
     true_labels = np.asarray([0 if x["is_safe"] else 1 for x in dataset.to_list()])
 
     outputs = {}
-    for i, model in enumerate(models):
+    for i, model in enumerate(args.models):
         model_name, uncalibrated_output, calibrated_outputs = load_model_predictions(
             model,
-            taxonomy,
+            args.taxonomy,
             methods=["context-free", "batch", "temperature"],
         )
-        outputs[model_name + f"_{i}"] = {
-            "uncalibrated_output": uncalibrated_output,
-            "calibrated_outputs": calibrated_outputs,
-        }
+        outputs[model_name] = {"uncalibrated_output": uncalibrated_output, **calibrated_outputs}
 
     compare_uncalibrated_model_reliability_diagram_and_confidence_histogram(
-        outputs, true_labels, n_bins=plot_bins, output_dir=output_dir
+        outputs, true_labels, n_bins=args.plot_bins, output_dir=output_dir
     )
 
     for model_name, output in outputs.items():
@@ -185,7 +170,7 @@ def main(args: argparse.Namespace) -> None:
             model_name,
             output,
             true_labels,
-            n_bins=plot_bins,
+            n_bins=args.plot_bins,
             output_dir=output_dir,
         )
 
@@ -193,7 +178,7 @@ def main(args: argparse.Namespace) -> None:
             model_name,
             output,
             true_labels,
-            n_bins=plot_bins,
+            n_bins=args.plot_bins,
             output_dir=output_dir,
         )
 
@@ -203,6 +188,12 @@ def main(args: argparse.Namespace) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--models", type=str, nargs="+", help="List of model names")
+    parser.add_argument("--dataset_name", type=str, default="PKU-Alignment/Beavertails", help="Name of the dataset")
+    parser.add_argument("--split", type=str, default="330k_test", help="Dataset split to use")
+    parser.add_argument("--taxonomy", type=str, default="beavertails", help="Taxonomy to use")
+    parser.add_argument("--sample_size", type=int, default=2000, help="Number of samples to use")
+    parser.add_argument("--plot_bins", type=int, default=10, help="Number of bins for plots")
     parser.add_argument("--show", default=False, action="store_true")
     parser.add_argument("--output_dir", type=str, default="results/comparison/plots")
     args = parser.parse_args()

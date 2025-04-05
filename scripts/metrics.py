@@ -12,6 +12,7 @@ def generate_metrics_table(
     float_fmt: str = "{:.3f}",
 ) -> None:
     metric_names = [*cal_metrics, *cls_metrics]
+    cap_metric_names = [m.upper() if len(m) < 6 else m.capitalize() for m in metric_names]
 
     filepath = Path("results/comparison/metrics/metrics.tex")
     filepath.parent.mkdir(parents=True, exist_ok=True)
@@ -22,7 +23,7 @@ def generate_metrics_table(
         tex_file.write("\\begin{document}\n")
         tex_file.write("\\begin{tabular}{l|" + "c" * len(cal_metrics) + "|" + "c" * len(cls_metrics) + "}\n")
         tex_file.write("\\toprule\n")
-        tex_file.write("Model & " + " & ".join(metric_names) + " \\\\\n")
+        tex_file.write("Model & " + " & ".join(cap_metric_names) + " \\\\\n")
         tex_file.write("\\midrule\n")
 
         for i, model in enumerate(models):
