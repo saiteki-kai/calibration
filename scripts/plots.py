@@ -174,7 +174,7 @@ def save_figure(fig: "Figure", path: Path | str, filename: str) -> None:
 def main(args: argparse.Namespace) -> None:
     models = ["meta-llama__Llama-Guard-3-1B", "meta-llama__Llama-Guard-3-1B"]
     taxonomy = "beavertails"
-    sample_size = 10000
+    sample_size = 2000
     plot_bins = 10
 
     # Set up output directory
