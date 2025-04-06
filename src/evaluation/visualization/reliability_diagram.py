@@ -1,5 +1,7 @@
 from typing import TYPE_CHECKING
 
+from netcal.metrics import ECE, MCE
+
 from src.evaluation.visualization.utils import compute_calibration_curve
 
 
@@ -7,6 +9,10 @@ if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from numpy import float64, int64
     from numpy.typing import NDArray
+
+
+ece_calculator = ECE(bins=15)
+mce_calculator = MCE(bins=15)
 
 
 def reliability_diagram(
@@ -58,3 +64,21 @@ def reliability_diagram(
     ax.set_ylabel("Accuracy")
     ax.set_xlabel("Confidence")
     ax.legend(loc="upper left")
+
+    ece_value = ece_calculator.measure(pred_probs, true_labels)
+    mce_value = mce_calculator.measure(pred_probs, true_labels)
+
+    ax.text(
+        0.97,
+        0.03,
+        f"ECE: {ece_value:.3f}\nMCE: {mce_value:.3f}",
+        transform=ax.transAxes,
+        verticalalignment="bottom",
+        horizontalalignment="right",
+        bbox={
+            "boxstyle": "round,pad=0.3",
+            "facecolor": "white",
+            "edgecolor": "lightgrey",
+            "alpha": 0.8,
+        },
+    )
