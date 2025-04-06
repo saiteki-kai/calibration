@@ -30,10 +30,11 @@ def compare_uncalibrated_model_reliability_diagram_and_confidence_histogram(
     outputs: dict[str, dict[str, PredictionOutput]],
     true_labels: "NDArray[int64]",
     n_bins: int,
-    output_dir: Path | str | None = None,
+    output_path: Path | str | None = None,
 ) -> "Figure":
     fig_name = "Reliability Diagram and Confidence Distribution - Uncalibrated Models"
     fig, axes = plt.subplots(2, len(outputs), figsize=(10, 10), num=fig_name)
+    axes = np.array(axes).reshape(2, len(outputs))
 
     for i, (model, output) in enumerate(outputs.items()):
         uncalibrated_output = output["uncalibrated_output"]
@@ -55,8 +56,8 @@ def compare_uncalibrated_model_reliability_diagram_and_confidence_histogram(
 
     fig.tight_layout()
 
-    if output_dir is not None:
-        save_figure(fig, output_dir, "uncalibrated_reliability_diagram")
+    if output_path is not None:
+        save_figure(fig, output_path, "uncalibrated_reliability_diagram")
 
     return fig
 
@@ -68,7 +69,7 @@ def compare_calibrated_model_reliability_diagram(
     n_bins: int,
     output_dir: Path | str | None = None,
 ) -> "Figure":
-    fig_name = f"Reliability Diagram and Confidence Distribution - {model_name}"
+    fig_name = f"Reliability Diagram and Confidence Distribution - {model_name.split('/')[-1]}"
     fig, axes = plt.subplots(2, len(outputs), figsize=(20, 10), num=fig_name)
 
     for i, (method, output) in enumerate(outputs.items()):
@@ -90,7 +91,7 @@ def compare_calibrated_model_reliability_diagram(
     fig.tight_layout()
 
     if output_dir is not None:
-        save_figure(fig, output_dir, f"{model_name}_reliability_diagram")
+        save_figure(fig, output_dir, f"{model_name.replace('/', '__')}_reliability_diagram")
 
     return fig
 
@@ -102,7 +103,7 @@ def compare_calibrated_model_curve(
     n_bins: int,
     output_dir: Path | str | None = None,
 ) -> "Figure":
-    fig_name = f"Calibration Curve - {model_name}"
+    fig_name = f"Calibration Curve - {model_name.split('/')[-1]}"
     fig, ax = plt.subplots(figsize=(20, 10), num=fig_name)
 
     pred_probs = {METHODS_NAMES[method]: output.label_probs[:, 1] for (method, output) in outputs.items()}
@@ -114,25 +115,25 @@ def compare_calibrated_model_curve(
     fig.tight_layout()
 
     if output_dir is not None:
-        save_figure(fig, output_dir, f"{model_name}_calibration_curve")
+        save_figure(fig, output_dir, f"{model_name.replace('/', '__')}_calibration_curve")
 
     return fig
 
 
 def load_model_predictions(
     model_name: str,
-    taxonomy: str,
     methods: list[str],
+    input_path: Path | str,
 ) -> tuple[str, ClassifierOutput, dict[str, CalibratorOutput]]:
-    model_dir = Path(f"results/{model_name.replace('/', '__')}/{taxonomy}")
+    model_dir = Path(input_path) / model_name.replace("/", "__") / "predictions"
 
     # Load uncalibrated predictions
-    uncalibrated_output = ClassifierOutput.from_npz(model_dir / "evaluation" / "predictions.npz")
+    uncalibrated_output = ClassifierOutput.from_npz(model_dir / "predictions.npz")
 
     # Load calibrated predictions
     calibrated_outputs = {}
     for method in methods:
-        cal_output = CalibratorOutput.from_npz(model_dir / "evaluation" / f"{method}_predictions.npz")
+        cal_output = CalibratorOutput.from_npz(model_dir / f"{method}_predictions.npz")
         calibrated_outputs[method] = cal_output
 
     return model_name, uncalibrated_output, calibrated_outputs
@@ -140,8 +141,8 @@ def load_model_predictions(
 
 def main(args: argparse.Namespace) -> None:
     # Set up output directory
-    output_dir = Path(args.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = Path(args.output_path)
+    output_path.mkdir(parents=True, exist_ok=True)
 
     # Load dataset
     dataset = load_dataset(args.dataset_name, split=args.split)
@@ -153,16 +154,16 @@ def main(args: argparse.Namespace) -> None:
     true_labels = np.asarray([0 if x["is_safe"] else 1 for x in dataset.to_list()])
 
     outputs = {}
-    for i, model in enumerate(args.models):
+    for model in args.models:
         model_name, uncalibrated_output, calibrated_outputs = load_model_predictions(
             model,
-            args.taxonomy,
             methods=["context-free", "batch", "temperature"],
+            input_path=args.input_path,
         )
         outputs[model_name] = {"uncalibrated_output": uncalibrated_output, **calibrated_outputs}
 
     compare_uncalibrated_model_reliability_diagram_and_confidence_histogram(
-        outputs, true_labels, n_bins=args.plot_bins, output_dir=output_dir
+        outputs, true_labels, n_bins=args.plot_bins, output_path=output_path
     )
 
     for model_name, output in outputs.items():
@@ -171,7 +172,7 @@ def main(args: argparse.Namespace) -> None:
             output,
             true_labels,
             n_bins=args.plot_bins,
-            output_dir=output_dir,
+            output_dir=output_path,
         )
 
         compare_calibrated_model_curve(
@@ -179,7 +180,7 @@ def main(args: argparse.Namespace) -> None:
             output,
             true_labels,
             n_bins=args.plot_bins,
-            output_dir=output_dir,
+            output_dir=output_path,
         )
 
     if args.show:
@@ -189,12 +190,12 @@ def main(args: argparse.Namespace) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--models", type=str, nargs="+", help="List of model names")
-    parser.add_argument("--dataset_name", type=str, default="PKU-Alignment/Beavertails", help="Name of the dataset")
+    parser.add_argument("--dataset-name", type=str, default="PKU-Alignment/Beavertails", help="Name of the dataset")
     parser.add_argument("--split", type=str, default="330k_test", help="Dataset split to use")
-    parser.add_argument("--taxonomy", type=str, default="beavertails", help="Taxonomy to use")
-    parser.add_argument("--sample_size", type=int, default=2000, help="Number of samples to use")
-    parser.add_argument("--plot_bins", type=int, default=10, help="Number of bins for plots")
+    parser.add_argument("--sample-size", type=int, default=2000, help="Number of samples to use")
+    parser.add_argument("--plot-bins", type=int, default=10, help="Number of bins for plots")
     parser.add_argument("--show", default=False, action="store_true")
-    parser.add_argument("--output_dir", type=str, default="results/comparison/plots")
+    parser.add_argument("--input-path", type=str, default="results/evaluation/")
+    parser.add_argument("--output-path", type=str, default="results/comparison/plots")
     args = parser.parse_args()
     main(args)

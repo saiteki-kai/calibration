@@ -1,4 +1,5 @@
 import argparse
+import json
 
 from pathlib import Path
 from typing import Any, cast
@@ -193,11 +194,15 @@ def main(args: argparse.Namespace) -> None:
     guard_model = GuardModel(args.model, taxonomy=args.taxonomy, descriptions=args.descriptions)
     model_kwargs = {"max_new_tokens": 10}
 
+    # Ensure output path exists
+    output_path = Path(args.output_path)
+    output_path.mkdir(parents=True, exist_ok=True)
+
     # Load or Compute Predictions
     pred_output = compute_or_load_predictions(
         guard_model,
         validation_set,
-        Path(args.output_path) / "tuning" / "predictions.npz",
+        args.output_path / "predictions" / "predictions.npz",
         model_kwargs=model_kwargs,
     )
 
@@ -212,12 +217,17 @@ def main(args: argparse.Namespace) -> None:
         model_kwargs=model_kwargs,
     )
 
-    tuning_plots_path = Path(args.output_path) / "tuning" / "plots"
-    tuning_plots_path.mkdir(parents=True, exist_ok=True)
-    plot_metrics(temp_metrics_history, "temperature", tuning_plots_path)
+    plots_path = args.output_path / "plots"
+    plots_path.mkdir(parents=True, exist_ok=True)
+    plot_metrics(temp_metrics_history, "temperature", plots_path)
 
     print(f"Best Temperature: {best_temperature}")
     print(f"Best Metrics (Temperature): {best_temp_metrics}")
+
+    with (args.output_path / "temperature.json").open("w", encoding="utf-8") as f:
+        data = {"best": best_temperature, "best_metrics": best_temp_metrics, "history": temp_metrics_history}
+        f.write(json.dumps(data, indent=4))
+        print("Temperature tuning results saved.")
 
 
 def parse_args() -> argparse.Namespace:

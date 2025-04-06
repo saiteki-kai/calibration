@@ -3,18 +3,19 @@ import json
 from pathlib import Path
 
 
-def generate_metrics_table(
+def generate_latex_metrics_table(
     models: list[str],
-    taxonomy: str,
     cal_metrics: list[str],
     cls_metrics: list[str],
     short_names: dict[str, str],
+    input_path: Path,
+    output_path: Path,
     float_fmt: str = "{:.3f}",
 ) -> None:
     metric_names = [*cal_metrics, *cls_metrics]
     cap_metric_names = [m.upper() if len(m) < 6 else m.capitalize() for m in metric_names]
 
-    filepath = Path("results/comparison/metrics/metrics.tex")
+    filepath = output_path / "metrics.tex"
     filepath.parent.mkdir(parents=True, exist_ok=True)
 
     with filepath.open("w", encoding="utf-8") as tex_file:
@@ -28,8 +29,7 @@ def generate_metrics_table(
 
         for i, model in enumerate(models):
             # Load metrics for the current model
-            with Path(f"results/{model}/{taxonomy}/metrics.json").open("r", encoding="utf-8") as json_file:
-                metrics = json.load(json_file)
+            metrics = load_metrics(input_path, model)
 
             for method, method_metrics in metrics.items():
                 method_name = model.split("__")[1] if short_names[method] == "" else short_names[method]
@@ -47,9 +47,15 @@ def generate_metrics_table(
         tex_file.write("\\end{document}\n")
 
 
+def load_metrics(input_path: Path, model: str) -> dict[str, dict[str, float]]:
+    filepath = input_path / model / "metrics.json"
+
+    with filepath.open("r", encoding="utf-8") as json_file:
+        return json.load(json_file)
+
+
 def main() -> None:
     models = ["meta-llama__Llama-Guard-3-1B"]
-    taxonomy = "beavertails"
 
     cls_metrics = ["f1", "precision", "recall", "accuracy", "auprc"]
     cal_metrics = ["ece", "mce"]  # "brier"
@@ -61,7 +67,14 @@ def main() -> None:
         "context-free": "+CC",
     }
 
-    generate_metrics_table(models, taxonomy, cal_metrics, cls_metrics, short_names)
+    generate_latex_metrics_table(
+        models,
+        cal_metrics,
+        cls_metrics,
+        short_names,
+        input_path=Path("results/evaluation/"),
+        output_path=Path("results/comparison/metrics/"),
+    )
 
 
 if __name__ == "__main__":

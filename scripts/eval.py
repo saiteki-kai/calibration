@@ -50,7 +50,7 @@ def main(args: argparse.Namespace) -> None:
     output = compute_or_load_predictions(
         guard_model,
         dataset,
-        output_path / "evaluation" / "predictions.npz",
+        output_path / "predictions" / "predictions.npz",
         model_kwargs=model_kwargs,
     )
 
@@ -61,7 +61,7 @@ def main(args: argparse.Namespace) -> None:
     calibrators: dict[str, BaseCalibrator] = {
         "context-free": ContextFreeCalibrator(guard_model, token=["N/A"], model_kwargs=model_kwargs),
         "batch": BatchCalibrator(guard_model, output.label_probs, model_kwargs=model_kwargs),
-        "temperature": TemperatureCalibrator(guard_model, temperature=5.6, model_kwargs=model_kwargs),
+        "temperature": TemperatureCalibrator(guard_model, temperature=args.temperature, model_kwargs=model_kwargs),
     }
 
     calibrated_outputs: dict[str, CalibratorOutput] = {}
@@ -83,7 +83,7 @@ def main(args: argparse.Namespace) -> None:
 
     # Save calibrated results
     for method_name, cal_output in calibrated_outputs.items():
-        cal_output.to_npz(output_path / "evaluation" / f"{method_name}_predictions.npz")
+        cal_output.to_npz(output_path / "predictions" / f"{method_name}_predictions.npz")
 
     print(SEPARATOR)
     print_summary(metrics)
@@ -100,6 +100,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--descriptions", type=bool, default=False, help="Whether to use safety descriptions")
     parser.add_argument("--ece-bins", type=int, default=15, help="Number of bins for ECE calculation")
     parser.add_argument("--output-path", type=str, default="results", help="Path to save the output")
+    parser.add_argument("--temperature", type=float, default=5.0, help="Temperature for calibration")
     parser.add_argument("--max-new-tokens", type=int, default=10, help="Maximum number of tokens to generate")
     return parser.parse_args()
 
