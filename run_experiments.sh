@@ -40,6 +40,7 @@ for model in "${models[@]}"; do
         --output-path "${tuning_path}$(hf_name_to_path "$model")/"
 
     temperature=$(jq <"${tuning_path}$(hf_name_to_path "$model")/temperature.json" -r '.best')
+    gamma=$(jq <"${tuning_path}$(hf_name_to_path "$model")/gamma.json" -r '.best')
 
     # 2. Evaluate uncalibrated and calibrated models
 
@@ -51,6 +52,7 @@ for model in "${models[@]}"; do
         --descriptions "${descriptions}" \
         --ece-bins "${ece_bins}" \
         --temperature "${temperature}" \
+        --gamma "${gamma}" \
         --output-path "${evaluation_path}$(hf_name_to_path "$model")/"
 done
 

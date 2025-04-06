@@ -23,17 +23,22 @@ class BatchCalibrator(BaseCalibrator):
         self,
         guard_model: GuardModel,
         probs: "NDArray[float64]",
+        gamma: float = 1.0,
         model_kwargs: dict[str, Any] | None = None,
     ) -> None:
         super().__init__(guard_model, model_kwargs)
         self._probs = probs
+        self._gamma = gamma
 
     @override
     def _calibrate_prob(self, prob: "NDArray[float64]", prior: "NDArray[float64]") -> "NDArray[float64]":
+        if self._gamma == 0:
+            return prob
+
         num_classes = prob.shape[0]
 
         W = np.identity(num_classes)
-        b = -1 * np.log(prior)
+        b = -self._gamma * np.log(prior)
         cal_prob = np.matmul(W, np.log(prob + 10e-6)) + b
         cal_prob = np.exp(cal_prob)
 

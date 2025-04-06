@@ -47,11 +47,12 @@ def tune_parameter(
         "recall": [],
     }
 
-    for param_value in param_range:
+    for value in param_range:
         if param_name == "temperature":
-            calibrator = TemperatureCalibrator(guard_model, temperature=param_value, model_kwargs=model_kwargs)
-        elif param_name == "batch":
-            calibrator = BatchCalibrator(guard_model, pred_output.label_probs, model_kwargs=model_kwargs)
+            calibrator = TemperatureCalibrator(guard_model, temperature=value, model_kwargs=model_kwargs)
+        # TODO: refactor passing the calibration method or the calibrator itself
+        elif param_name == "gamma":
+            calibrator = BatchCalibrator(guard_model, pred_output.label_probs, gamma=value, model_kwargs=model_kwargs)
         else:
             msg = f"Unknown parameter: {param_name}"
             raise ValueError(msg)
@@ -63,7 +64,7 @@ def tune_parameter(
         metrics["nll"] = float(nll)
 
         # Store metrics for plotting
-        metrics_history[param_name].append(param_value)
+        metrics_history[param_name].append(value)
         metrics_history["ece"].append(metrics["ece"])
         metrics_history["mce"].append(metrics["mce"])
         metrics_history["accuracy"].append(metrics["accuracy"])
@@ -75,7 +76,7 @@ def tune_parameter(
         # Check if this parameter value is the best so far
         if metrics["nll"] < best_nll:
             best_nll = metrics["nll"]
-            best_param = param_value
+            best_param = value
             best_metrics = metrics
 
     return best_param, best_metrics, metrics_history
@@ -185,9 +186,8 @@ def main(args: argparse.Namespace) -> None:
     dataset = load_dataset(args.dataset_name, split=args.split)
     dataset = cast("Dataset", dataset)
 
-    if "train" in args.split:
-        # Create a validation set (10% of the training data)
-        validation_set = dataset.train_test_split(test_size=0.01, seed=args.seed)["test"]
+    if "train" in args.split and args.test_size > 0:
+        validation_set = dataset.train_test_split(test_size=args.test_size, seed=args.seed)["test"]
     else:
         validation_set = dataset
 
@@ -206,28 +206,45 @@ def main(args: argparse.Namespace) -> None:
         model_kwargs=model_kwargs,
     )
 
-    # Tune temperature
-    best_temperature, best_temp_metrics, temp_metrics_history = tune_parameter(
-        args,
-        guard_model,
-        pred_output,
-        validation_set,
-        "temperature",
-        np.arange(0.1, 30.0, 0.1),
-        model_kwargs=model_kwargs,
-    )
+    method_hyperparams = {
+        "temperature": {
+            "param": "temperature",
+            "param_range": np.arange(0.1, 30.1, 0.1),
+            "metric": "nll",
+        },
+        "batch": {
+            "param": "gamma",
+            "param_range": np.arange(-5, 5.1, 0.1),
+            "metric": "accuracy",  ###########################################
+        },
+    }
 
-    plots_path = args.output_path / "plots"
-    plots_path.mkdir(parents=True, exist_ok=True)
-    plot_metrics(temp_metrics_history, "temperature", plots_path)
+    for method, hyperparams in method_hyperparams.items():
+        print(f"Tuning {hyperparams['param'].capitalize()} for {method} method...")
+        print(f"Parameter Range: {hyperparams['param_range']}")
 
-    print(f"Best Temperature: {best_temperature}")
-    print(f"Best Metrics (Temperature): {best_temp_metrics}")
+        best_value, best_temp_metrics, temp_metrics_history = tune_parameter(
+            args,
+            guard_model,
+            pred_output,
+            validation_set,
+            hyperparams["param"],
+            hyperparams["param_range"],
+            model_kwargs=model_kwargs,
+        )
 
-    with (args.output_path / "temperature.json").open("w", encoding="utf-8") as f:
-        data = {"best": best_temperature, "best_metrics": best_temp_metrics, "history": temp_metrics_history}
-        f.write(json.dumps(data, indent=4))
-        print("Temperature tuning results saved.")
+        plots_path = args.output_path / "plots"
+        plots_path.mkdir(parents=True, exist_ok=True)
+        plot_metrics(temp_metrics_history, hyperparams["param"], plots_path)
+
+        print(f"Best {hyperparams['param'].capitalize()}: {best_value}")
+        print(f"Best Metrics ({hyperparams['param'].capitalize()}): {best_temp_metrics}")
+
+        with (args.output_path / f"{hyperparams['param']}.json").open("w", encoding="utf-8") as f:
+            data = {"best": best_value, "best_metrics": best_temp_metrics, "history": temp_metrics_history}
+            f.write(json.dumps(data, indent=4))
+
+            print(f"{hyperparams['param'].capitalize()} tuning results saved.")
 
 
 def parse_args() -> argparse.Namespace:
@@ -236,6 +253,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model", type=str, default="meta-llama/Llama-Guard-3-1B", help="Model to use")
     parser.add_argument("--dataset-name", type=str, default="PKU-Alignment/Beavertails", help="Dataset name")
     parser.add_argument("--split", type=str, default="330k_train", help="Split to use")
+    parser.add_argument("--test-size", type=float, default=0.1, help="Size of the validation set")
     parser.add_argument("--taxonomy", type=str, default="llama-guard-3", help="Taxonomy used in chat template")
     parser.add_argument("--descriptions", type=bool, default=False, help="Whether to use safety descriptions")
     parser.add_argument("--ece-bins", type=int, default=15, help="Number of bins for ECE calculation")

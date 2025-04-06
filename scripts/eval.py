@@ -101,6 +101,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ece-bins", type=int, default=15, help="Number of bins for ECE calculation")
     parser.add_argument("--output-path", type=str, default="results", help="Path to save the output")
     parser.add_argument("--temperature", type=float, default=5.0, help="Temperature for calibration")
+    parser.add_argument("--gamma", type=float, default=1.0, help="Gamma for batch calibration")
     parser.add_argument("--max-new-tokens", type=int, default=10, help="Maximum number of tokens to generate")
     return parser.parse_args()
 
