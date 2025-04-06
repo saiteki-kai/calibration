@@ -16,9 +16,8 @@ taxonomy="beavertails"
 descriptions="False"
 
 models=(
-    "meta-llama/Llama-Guard-3-1B"
-    "meta-llama/Llama-Guard-3-1B"
-    # "meta-llama/Llama-Guard-3-8B-Lora"
+    "meta-llama/Llama-Guard-3-8B"
+    "saiteki-kai/Llama-Guard-3-8B-Lora"
 )
 
 ece_bins=15
@@ -27,7 +26,7 @@ sample_size=1000
 
 evaluation_path="results/evaluation/"
 tuning_path="results/tuning/"
-plots_path="results/comparison/"
+comparison_path="results/comparison/"
 
 for model in "${models[@]}"; do
     # 1. Tuning parametrized calibration methods
@@ -63,6 +62,9 @@ python scripts/plots.py --models "${models[@]}" \
     --split "${eval_split}" \
     --plot-bins "${plot_bins}" \
     --input-path "${evaluation_path}" \
-    --output-path "${plots_path}"
+    --output-path "${comparison_path}"
 
-python scripts/metrics.py
+python scripts/metrics.py \
+    --models "${models[@]}" \
+    --input-path "${evaluation_path}" \
+    --output-path "${comparison_path}/metrics" \
