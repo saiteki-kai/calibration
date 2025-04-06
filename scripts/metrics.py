@@ -30,7 +30,7 @@ def generate_latex_metrics_table(
 
         for i, model in enumerate(models):
             # Load metrics for the current model
-            metrics = load_metrics(input_path, model)
+            metrics = load_metrics(input_path, model.replace("/", "__"))
 
             for method, method_metrics in metrics.items():
                 method_name = model.split("/")[1] if short_names[method] == "" else short_names[method]
