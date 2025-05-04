@@ -60,7 +60,7 @@ def main(args: argparse.Namespace) -> None:
 
     calibrators: dict[str, BaseCalibrator] = {
         "context-free": ContextFreeCalibrator(guard_model, token=["N/A"], model_kwargs=model_kwargs),
-        "batch": BatchCalibrator(guard_model, output.label_probs, model_kwargs=model_kwargs),
+        "batch": BatchCalibrator(guard_model, output.label_probs, gamma=args.gamma, model_kwargs=model_kwargs),
         "temperature": TemperatureCalibrator(guard_model, temperature=args.temperature, model_kwargs=model_kwargs),
     }
 
