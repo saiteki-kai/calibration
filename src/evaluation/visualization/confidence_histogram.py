@@ -18,5 +18,5 @@ def confidence_histogram(
     ax.set_aspect("equal")
 
     ax.set_xlabel("Confidence")
-    ax.set_ylabel(r"% of Samples")
+    ax.set_ylabel(r"\% of Samples")
     ax.set_title(title)
