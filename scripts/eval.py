@@ -59,7 +59,7 @@ def main(args: argparse.Namespace) -> None:
     metrics["uncalibrated"] = compute_metrics(true_labels, output, ece_bins=args.ece_bins)
 
     calibrators: dict[str, BaseCalibrator] = {
-        "context-free": ContextFreeCalibrator(guard_model, token=["N/A"], model_kwargs=model_kwargs),
+        "context-free": ContextFreeCalibrator(guard_model, token=[" "], model_kwargs=model_kwargs),
         "batch": BatchCalibrator(guard_model, output.label_probs, gamma=args.gamma, model_kwargs=model_kwargs),
         "temperature": TemperatureCalibrator(guard_model, temperature=args.temperature, model_kwargs=model_kwargs),
     }
