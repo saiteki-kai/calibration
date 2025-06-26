@@ -30,9 +30,10 @@ def calibration_curve(
 
     for i, prob_pred in enumerate(pred_probs):
         prob_true, prob_pred, _ = compute_calibration_curve(true_labels, prob_pred, n_bins=n_bins)
+
         ax.plot(
-            prob_pred[:-1],
-            prob_true[:-1],
+            prob_pred[prob_pred != -1],
+            prob_true[prob_pred != -1],
             marker="s",
             linewidth=2,
             markersize=8,

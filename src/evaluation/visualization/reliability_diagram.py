@@ -24,6 +24,10 @@ def reliability_diagram(
 ) -> None:
     prob_true, prob_pred, bins = compute_calibration_curve(true_labels, pred_probs, n_bins=n_bins)
 
+    # Empty bins
+    prob_true[prob_true == -1] = 0
+    prob_pred[prob_pred == -1] = 0
+
     bin_width = 1 / n_bins
     linewidth = 1.5
 

@@ -18,18 +18,19 @@ def compute_calibration_curve(
     bins = np.linspace(0.0, 1.0, n_bins + 1)
     binids = np.searchsorted(bins[1:-1], y_pred)
 
-    bin_sums = np.bincount(binids, weights=y_pred, minlength=len(bins))
-    bin_true = np.bincount(binids, weights=y_true, minlength=len(bins))
-    bin_total = np.bincount(binids, minlength=len(bins))
+    bin_sums = np.bincount(binids, weights=y_pred, minlength=n_bins)
+    bin_true = np.bincount(binids, weights=y_true, minlength=n_bins)
+    bin_total = np.bincount(binids, minlength=n_bins)
 
-    nonzero = bin_total != 0
-    prob_true = np.zeros(len(bin_total))
-    prob_true[nonzero] = bin_true[nonzero] / bin_total[nonzero]
+    prob_true = np.ones(n_bins) * -1
+    prob_pred = np.ones(n_bins) * -1
 
-    prob_pred = np.zeros(len(bin_total))
-    prob_pred[nonzero] = bin_sums[nonzero] / bin_total[nonzero]
+    for bin_idx in range(n_bins):
+        if bin_total[bin_idx] != 0:
+            prob_true[bin_idx] = bin_true[bin_idx] / bin_total[bin_idx]
+            prob_pred[bin_idx] = bin_sums[bin_idx] / bin_total[bin_idx]
 
-    return prob_true, prob_pred, bins
+    return prob_true, prob_pred, bins[:-1]
 
 
 def save_figure(fig: "Figure", path: Path | str, filename: str) -> None:
