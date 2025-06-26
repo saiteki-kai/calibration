@@ -3,8 +3,10 @@ import argparse
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 
 from datasets import Dataset, load_dataset
 
@@ -17,6 +19,13 @@ if TYPE_CHECKING:
     from matplotlib.figure import Figure
     from numpy import int64
     from numpy.typing import NDArray
+
+
+sns.set_theme(style="white", context="paper", font_scale=1.2)
+
+mpl.rcParams["text.usetex"] = True
+mpl.rcParams["text.latex.preamble"] = "\\usepackage{libertinus}"
+
 
 METHODS_NAMES = {
     "uncalibrated_output": "Uncalibrated",
@@ -33,7 +42,7 @@ def compare_uncalibrated_model_reliability_diagram_and_confidence_histogram(
     output_path: Path | str | None = None,
 ) -> "Figure":
     fig_name = "Reliability Diagram and Confidence Distribution - Uncalibrated Models"
-    fig, axes = plt.subplots(2, len(outputs), figsize=(10, 10), num=fig_name)
+    fig, axes = plt.subplots(2, len(outputs), figsize=(8, 8), num=fig_name)
     axes = np.array(axes).reshape(2, len(outputs))
 
     for i, (model, output) in enumerate(outputs.items()):
@@ -70,7 +79,7 @@ def compare_calibrated_model_reliability_diagram(
     output_dir: Path | str | None = None,
 ) -> "Figure":
     fig_name = f"Reliability Diagram and Confidence Distribution - {model_name.split('/')[-1]}"
-    fig, axes = plt.subplots(2, len(outputs), figsize=(20, 10), num=fig_name)
+    fig, axes = plt.subplots(2, len(outputs), figsize=(16, 8), num=fig_name)
 
     for i, (method, output) in enumerate(outputs.items()):
         confidence_histogram(
@@ -104,13 +113,20 @@ def compare_calibrated_model_curve(
     output_dir: Path | str | None = None,
 ) -> "Figure":
     fig_name = f"Calibration Curve - {model_name.split('/')[-1]}"
-    fig, ax = plt.subplots(figsize=(20, 10), num=fig_name)
+    fig, ax = plt.subplots(figsize=(6, 6), num=fig_name)
 
     pred_probs = {METHODS_NAMES[method]: output.label_probs[:, 1] for (method, output) in outputs.items()}
     labels = list(pred_probs.keys())
     probs = list(pred_probs.values())
 
-    calibration_curve(true_labels=true_labels, pred_probs=probs, ax=ax, n_bins=n_bins, label=labels)
+    calibration_curve(
+        true_labels=true_labels,
+        pred_probs=probs,
+        ax=ax,
+        n_bins=n_bins,
+        label=labels,
+        title=model_name.split("/")[-1],
+    )
 
     fig.tight_layout()
 
@@ -192,7 +208,7 @@ if __name__ == "__main__":
     parser.add_argument("--models", type=str, nargs="+", help="List of model names")
     parser.add_argument("--dataset-name", type=str, default="PKU-Alignment/Beavertails", help="Name of the dataset")
     parser.add_argument("--split", type=str, default="330k_test", help="Dataset split to use")
-    parser.add_argument("--sample-size", type=int, default=2000, help="Number of samples to use")
+    parser.add_argument("--sample-size", type=int, default=None, help="Number of samples to use")
     parser.add_argument("--plot-bins", type=int, default=10, help="Number of bins for plots")
     parser.add_argument("--show", default=False, action="store_true")
     parser.add_argument("--input-path", type=str, default="results/evaluation/")
