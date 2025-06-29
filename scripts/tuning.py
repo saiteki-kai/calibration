@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any, cast
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -21,6 +22,12 @@ from src.evaluation.metrics import compute_metrics
 from src.evaluation.visualization.utils import save_figure
 
 
+sns.set_theme(style="white", context="paper", font_scale=1.2)
+
+mpl.rcParams["text.usetex"] = True
+mpl.rcParams["text.latex.preamble"] = "\\usepackage{libertinus}"
+
+
 def tune_parameter(
     args: argparse.Namespace,
     guard_model: GuardModel,
@@ -28,12 +35,15 @@ def tune_parameter(
     validation_set: Dataset,
     param_name: str,
     param_range: np.ndarray[float, np.dtype[np.float64]],
+    metric: str,
     model_kwargs: dict[str, Any],
 ) -> tuple[float | None, dict[str, float], dict[str, list[float]]]:
     true_labels = np.asarray([0 if x["is_safe"] else 1 for x in validation_set.to_list()])
 
+    lower_is_better = metric in ["nll", "ece", "mce"]
+
     best_param = None
-    best_nll = float("inf")
+    best_metric_value = float("inf") if lower_is_better else float("-inf")
     best_metrics = {}
 
     metrics_history = {
@@ -46,6 +56,10 @@ def tune_parameter(
         "precision": [],
         "recall": [],
     }
+
+    if metric not in metrics_history:
+        msg = f"Unknown metric: {metric}. Available metrics: {list(metrics_history.keys())}"
+        raise ValueError(msg)
 
     for value in param_range:
         if param_name == "temperature":
@@ -74,38 +88,32 @@ def tune_parameter(
         metrics_history["nll"].append(nll)
 
         # Check if this parameter value is the best so far
-        if metrics["nll"] < best_nll:
-            best_nll = metrics["nll"]
+        if (lower_is_better and metrics[metric] < best_metric_value) or (
+            not lower_is_better and metrics[metric] > best_metric_value
+        ):
+            best_metric_value = metrics[metric]
             best_param = value
             best_metrics = metrics
 
     return best_param, best_metrics, metrics_history
 
 
-def plot_metrics(metrics_history: dict[str, list[float]], param_name: str, output_path: Path) -> None:
-    sns.set_style("whitegrid")
-    sns.set_context("paper", font_scale=1.5)
-
+def plot_metrics(
+    metrics_history: dict[str, list[float]], metric: str, param_name: str, output_path: Path, model_name: str = "Model"
+) -> None:
     df_metrics = pd.DataFrame(metrics_history)
-    best_param_value = df_metrics.loc[df_metrics["nll"].idxmin(), param_name]
+    best_idx = df_metrics[metric].idxmin() if metric in ["nll", "ece", "mce"] else df_metrics[metric].idxmax()
+    best_param_value = df_metrics.loc[best_idx, param_name]
 
-    fig, axes = plt.subplots(3, 1, figsize=(12, 14), sharex=True)
+    fig, axes = plt.subplots(3, 1, figsize=(6, 8), sharex=True)
+
+    fig.suptitle(model_name, fontweight="bold")
 
     # NLL Plot
-    sns.lineplot(data=df_metrics, x=param_name, y="nll", ax=axes[0])
-    axes[0].axvline(
-        x=best_param_value, color="red", linestyle="--", alpha=0.7, label=f"Best {param_name}={best_param_value:.3f}"
-    )
-
-    # Add text annotation for the best value
-    best_nll = df_metrics["nll"].min()
-    axes[0].annotate(
-        f"Best NLL: {best_nll:.4f}",
-        xy=(best_param_value, best_nll),
-        xytext=(10, 15),
-        textcoords="offset points",
-        bbox={"boxstyle": "round,pad=0.3", "fc": "yellow", "alpha": 0.3},
-    )
+    sns.lineplot(data=df_metrics, x=param_name, y="nll", ax=axes[0], color="#1f77b4")
+    axes[0].axvline(x=best_param_value, color="#d62728", linestyle="--", alpha=0.7)
+    axes[0].set_ylabel("Negative Log-Likelihood")
+    axes[0].grid(True, linestyle="--", alpha=0.5)
 
     # Calibration Metrics Plot
     calibration_metrics = ["ece", "mce"]
@@ -120,19 +128,22 @@ def plot_metrics(metrics_history: dict[str, list[float]], param_name: str, outpu
         hue="Metric",
         style="Metric",
         dashes=False,
-        palette="husl",
-        linewidth=2,
+        palette=["#ff7f0e", "#2ca02c"],
+        linewidth=1.5,
         markersize=8,
         ax=axes[1],
     )
 
-    axes[1].axvline(
-        x=best_param_value, color="red", linestyle="--", alpha=0.7, label=f"Best {param_name}={best_param_value:.3f}"
+    axes[1].axvline(x=best_param_value, color="#d62728", linestyle="--", alpha=0.7)
+    axes[1].set_ylabel("Calibration Error")
+    axes[1].legend(
+        title="",
+        ncol=len(calibration_metrics),
+        loc="upper center",
+        bbox_to_anchor=(0.5, 1.2),
+        frameon=False,
     )
-    axes[1].set_title(f"Calibration Metrics vs. {param_name.capitalize()}")
-    axes[1].set_ylabel("Error Value")
-    axes[1].legend(title="Metric")
-    axes[1].grid(True, linestyle="--", alpha=0.7)
+    axes[1].grid(True, linestyle="--", alpha=0.5)
 
     # Classification Metrics Plot
     classification_metrics = ["accuracy", "f1", "precision", "recall"]
@@ -147,34 +158,77 @@ def plot_metrics(metrics_history: dict[str, list[float]], param_name: str, outpu
         hue="Metric",
         style="Metric",
         dashes=False,
-        palette="husl",
-        linewidth=2,
+        palette=["#9467bd", "#8c564b", "#e377c2", "#7f7f7f"],
+        linewidth=1.5,
         markersize=8,
         ax=axes[2],
     )
 
     # Add best parameter vertical line
-    axes[2].axvline(
-        x=best_param_value, color="red", linestyle="--", alpha=0.7, label=f"Best {param_name}={best_param_value:.3f}"
-    )
+    axes[2].axvline(x=best_param_value, color="#d62728", linestyle="--", alpha=0.7)
 
-    axes[2].set_title(f"Classification Metrics vs. {param_name.capitalize()}")
     axes[2].set_xlabel(f"{param_name.capitalize()} Value")
-    axes[2].set_ylabel("Metric Value")
-    axes[2].legend(title="Metric")
-    axes[2].grid(True, linestyle="--", alpha=0.7)
+    axes[2].set_ylabel("Classification Metrics")
+    axes[2].legend(
+        title="",
+        ncol=len(classification_metrics),
+        loc="upper center",
+        bbox_to_anchor=(0.5, 1.2),
+        frameon=False,
+    )
+    axes[2].grid(True, linestyle="--", alpha=0.5)
 
     # Add scatter points at best parameter value
     idx = np.argmin(np.abs(np.array(df_metrics[param_name]) - best_param_value))
-    axes[0].scatter([best_param_value], [df_metrics["nll"].iloc[idx]], color="red", zorder=5, s=50)
+    axes[0].scatter([best_param_value], [df_metrics["nll"].iloc[idx]], color="#d62728", zorder=5, s=60)
 
-    for metric in calibration_metrics:
-        axes[1].scatter([best_param_value], [df_metrics[metric].iloc[idx]], color="red", zorder=5, s=50)
+    for metric_name in calibration_metrics:
+        axes[1].scatter([best_param_value], [df_metrics[metric_name].iloc[idx]], color="#d62728", zorder=5, s=60)
 
-    for metric in classification_metrics:
-        axes[2].scatter([best_param_value], [df_metrics[metric].iloc[idx]], color="red", zorder=5, s=50)
+    for metric_name in classification_metrics:
+        axes[2].scatter([best_param_value], [df_metrics[metric_name].iloc[idx]], color="#d62728", zorder=5, s=60)
 
-    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    # Add text annotation for the best value AFTER all plots are drawn
+    best_metric = df_metrics[metric].min() if metric in ["nll", "ece", "mce"] else df_metrics[metric].max()
+    ax_idx = 0 if metric == "nll" else 1 if metric in ["ece", "mce"] else 2
+
+    # Calculate positioning for annotation
+    param_range = df_metrics[param_name].to_numpy()
+    param_min, param_max = param_range.min(), param_range.max()
+    relative_pos = (best_param_value - param_min) / (param_max - param_min)
+    param_span = param_range.max() - param_range.min()
+    offset = param_span * 0.05
+
+    if relative_pos > 0.6:
+        text_x_data = best_param_value - offset
+        ha = "right"
+    else:
+        text_x_data = best_param_value + offset
+        ha = "left"
+
+    # Get current axis limits and position annotation
+    y_min, y_max = axes[ax_idx].get_ylim()
+
+    if ax_idx == 0:  # NLL plot - align to top (lower is better)
+        text_y_data = y_max - (y_max - y_min) * 0.08
+        va = "top"
+    else:  # Other plots - align to bottom (higher is better)
+        text_y_data = y_min + (y_max - y_min) * 0.08
+        va = "bottom"
+
+    axes[ax_idx].annotate(
+        f"Best {metric.capitalize() if len(metric) > 3 else metric.upper()}: {best_metric:.4f}",
+        xy=(best_param_value, best_metric),
+        xycoords="data",
+        xytext=(text_x_data, text_y_data),
+        textcoords="data",
+        va=va,
+        ha=ha,
+        bbox={"boxstyle": "round,pad=0.3", "fc": "yellow", "alpha": 0.5},
+        zorder=10,
+    )
+
+    fig.tight_layout()
     save_figure(fig, output_path, f"{param_name}_tuning_metrics")
 
 
@@ -209,13 +263,13 @@ def main(args: argparse.Namespace) -> None:
     method_hyperparams = {
         "temperature": {
             "param": "temperature",
-            "param_range": np.arange(0.1, 30.1, 0.1),
+            "param_range": np.arange(0.1, 30.1, 0.1),  #  0.1
             "metric": "nll",
         },
         "batch": {
             "param": "gamma",
-            "param_range": np.arange(-5, 5.1, 0.1),
-            "metric": "accuracy",  ###########################################
+            "param_range": np.arange(-10, 10.1, 0.1),  # 0.1
+            "metric": "accuracy",
         },
     }
 
@@ -230,12 +284,13 @@ def main(args: argparse.Namespace) -> None:
             validation_set,
             hyperparams["param"],
             hyperparams["param_range"],
+            hyperparams["metric"],
             model_kwargs=model_kwargs,
         )
 
         plots_path = args.output_path / "plots"
         plots_path.mkdir(parents=True, exist_ok=True)
-        plot_metrics(temp_metrics_history, hyperparams["param"], plots_path)
+        plot_metrics(temp_metrics_history, hyperparams["metric"], hyperparams["param"], plots_path, args.model)
 
         print(f"Best {hyperparams['param'].capitalize()}: {best_value}")
         print(f"Best Metrics ({hyperparams['param'].capitalize()}): {best_temp_metrics}")
