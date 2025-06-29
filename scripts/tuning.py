@@ -99,13 +99,20 @@ def tune_parameter(
 
 
 def plot_metrics(
-    metrics_history: dict[str, list[float]], metric: str, param_name: str, output_path: Path, model_name: str = "Model"
+    metrics_history: dict[str, list[float]],
+    metric: str,
+    param_name: str,
+    output_path: Path,
+    model_name: str = "Model",
+    show_classification_metrics: bool = True,
 ) -> None:
     df_metrics = pd.DataFrame(metrics_history)
     best_idx = df_metrics[metric].idxmin() if metric in ["nll", "ece", "mce"] else df_metrics[metric].idxmax()
     best_param_value = df_metrics.loc[best_idx, param_name]
 
-    fig, axes = plt.subplots(3, 1, figsize=(6, 8), sharex=True)
+    n_cols = 3 if show_classification_metrics else 2
+    height = 8 if show_classification_metrics else 5
+    fig, axes = plt.subplots(n_cols, 1, figsize=(5, height), sharex=True)
 
     fig.suptitle(model_name, fontweight="bold")
 
@@ -143,6 +150,7 @@ def plot_metrics(
         bbox_to_anchor=(0.5, 1.2),
         frameon=False,
     )
+    axes[1].set_ylim(ymax=0.9)
     axes[1].grid(True, linestyle="--", alpha=0.5)
 
     # Classification Metrics Plot
@@ -151,42 +159,44 @@ def plot_metrics(
         df_metrics, id_vars=[param_name], value_vars=classification_metrics, var_name="Metric", value_name="Value"
     )
 
-    sns.lineplot(
-        data=melted_class,
-        x=param_name,
-        y="Value",
-        hue="Metric",
-        style="Metric",
-        dashes=False,
-        palette=["#9467bd", "#8c564b", "#e377c2", "#7f7f7f"],
-        linewidth=1.5,
-        markersize=8,
-        ax=axes[2],
-    )
+    if show_classification_metrics:
+        sns.lineplot(
+            data=melted_class,
+            x=param_name,
+            y="Value",
+            hue="Metric",
+            style="Metric",
+            dashes=False,
+            palette=["#9467bd", "#8c564b", "#e377c2", "#7f7f7f"],
+            linewidth=1.5,
+            markersize=8,
+            ax=axes[2],
+        )
 
-    # Add best parameter vertical line
-    axes[2].axvline(x=best_param_value, color="#d62728", linestyle="--", alpha=0.7)
+        # Add best parameter vertical line
+        axes[2].axvline(x=best_param_value, color="#d62728", linestyle="--", alpha=0.7)
 
-    axes[2].set_xlabel(f"{param_name.capitalize()} Value")
-    axes[2].set_ylabel("Classification Metrics")
-    axes[2].legend(
-        title="",
-        ncol=len(classification_metrics),
-        loc="upper center",
-        bbox_to_anchor=(0.5, 1.2),
-        frameon=False,
-    )
-    axes[2].grid(True, linestyle="--", alpha=0.5)
+        axes[2].set_xlabel(f"{param_name.capitalize()} Value")
+        axes[2].set_ylabel("Classification Metrics")
+        axes[2].legend(
+            title="",
+            ncol=len(classification_metrics),
+            loc="upper center",
+            bbox_to_anchor=(0.5, 1.2),
+            frameon=False,
+        )
+        axes[2].grid(True, linestyle="--", alpha=0.5)
 
     # Add scatter points at best parameter value
     idx = np.argmin(np.abs(np.array(df_metrics[param_name]) - best_param_value))
-    axes[0].scatter([best_param_value], [df_metrics["nll"].iloc[idx]], color="#d62728", zorder=5, s=60)
+    axes[0].scatter([best_param_value], [df_metrics["nll"].iloc[idx]], color="#d62728", zorder=5, s=15)
 
     for metric_name in calibration_metrics:
-        axes[1].scatter([best_param_value], [df_metrics[metric_name].iloc[idx]], color="#d62728", zorder=5, s=60)
+        axes[1].scatter([best_param_value], [df_metrics[metric_name].iloc[idx]], color="#d62728", zorder=5, s=15)
 
-    for metric_name in classification_metrics:
-        axes[2].scatter([best_param_value], [df_metrics[metric_name].iloc[idx]], color="#d62728", zorder=5, s=60)
+    if show_classification_metrics:
+        for metric_name in classification_metrics:
+            axes[2].scatter([best_param_value], [df_metrics[metric_name].iloc[idx]], color="#d62728", zorder=5, s=15)
 
     # Add text annotation for the best value AFTER all plots are drawn
     best_metric = df_metrics[metric].min() if metric in ["nll", "ece", "mce"] else df_metrics[metric].max()
@@ -263,13 +273,15 @@ def main(args: argparse.Namespace) -> None:
     method_hyperparams = {
         "temperature": {
             "param": "temperature",
-            "param_range": np.arange(0.1, 30.1, 0.1),  #  0.1
+            "param_range": np.arange(0.1, 20.05, 0.1),  #  0.1
             "metric": "nll",
+            "show_classification_metrics": False,
         },
         "batch": {
             "param": "gamma",
-            "param_range": np.arange(-10, 10.1, 0.1),  # 0.1
+            "param_range": np.arange(-10, 10.05, 0.1),  # 0.1
             "metric": "accuracy",
+            "show_classification_metrics": True,
         },
     }
 
@@ -290,7 +302,14 @@ def main(args: argparse.Namespace) -> None:
 
         plots_path = args.output_path / "plots"
         plots_path.mkdir(parents=True, exist_ok=True)
-        plot_metrics(temp_metrics_history, hyperparams["metric"], hyperparams["param"], plots_path, args.model)
+        plot_metrics(
+            temp_metrics_history,
+            hyperparams["metric"],
+            hyperparams["param"],
+            plots_path,
+            args.model,
+            hyperparams["show_classification_metrics"],
+        )
 
         print(f"Best {hyperparams['param'].capitalize()}: {best_value}")
         print(f"Best Metrics ({hyperparams['param'].capitalize()}): {best_temp_metrics}")
