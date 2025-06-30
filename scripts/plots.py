@@ -51,7 +51,7 @@ def compare_uncalibrated_model_reliability_diagram_and_confidence_histogram(
         confidence_histogram(
             ax=axes[0, i],
             pred_probs=uncalibrated_output.label_probs[:, 1],
-            n_bins=n_bins * 2,
+            n_bins=n_bins,
             title=model,
         )
 
@@ -85,7 +85,7 @@ def compare_calibrated_model_reliability_diagram(
         confidence_histogram(
             ax=axes[0, i],
             pred_probs=output.label_probs[:, 1],
-            n_bins=n_bins * 2,
+            n_bins=n_bins,
             title=METHODS_NAMES[method],
         )
 
