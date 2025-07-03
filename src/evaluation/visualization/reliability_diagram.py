@@ -65,7 +65,7 @@ def reliability_diagram(
     ax.set_aspect("equal", "box")
 
     ax.set_title(title)
-    ax.set_ylabel("Accuracy")
+    ax.set_ylabel("True Positive Rate")
     ax.set_xlabel("Confidence")
     ax.legend(loc="upper left")
 

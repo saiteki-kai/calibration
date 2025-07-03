@@ -49,6 +49,6 @@ def calibration_curve(
     ax.set_aspect("equal")
 
     ax.set_xlabel("Confidence")
-    ax.set_ylabel("Accuracy")
+    ax.set_ylabel("True Positive Rate")
     ax.legend(loc="lower right")
     ax.set_title(title)
