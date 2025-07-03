@@ -1,7 +1,6 @@
 from typing import TYPE_CHECKING
 
-from netcal.metrics import ECE, MCE
-
+from src.evaluation.metrics import binary_ece, binary_mce
 from src.evaluation.visualization.utils import compute_calibration_curve
 
 
@@ -11,15 +10,12 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
 
-ece_calculator = ECE(bins=15)
-mce_calculator = MCE(bins=15)
-
-
 def reliability_diagram(
     ax: "Axes",
     true_labels: "NDArray[int64]",
     pred_probs: "NDArray[float64]",
     n_bins: int = 10,
+    ece_bins: int = 15,
     title: str = "Reliability Diagram",
 ) -> None:
     prob_true, prob_pred, bins = compute_calibration_curve(true_labels, pred_probs, n_bins=n_bins)
@@ -69,8 +65,8 @@ def reliability_diagram(
     ax.set_xlabel("Confidence")
     ax.legend(loc="upper left")
 
-    ece_value = ece_calculator.measure(pred_probs, true_labels)
-    mce_value = mce_calculator.measure(pred_probs, true_labels)
+    ece_value = binary_ece(pred_probs, true_labels, ece_bins)
+    mce_value = binary_mce(pred_probs, true_labels, ece_bins)
 
     ax.text(
         0.97,
