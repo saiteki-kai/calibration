@@ -82,8 +82,8 @@ The framework evaluates both calibration and classification performance:
 Clone the repository:
 
 ```bash
-git clone https://github.com/saiteki-kai/llama_guard_calibration
-cd llama_guard_calibration
+git clone https://github.com/saiteki-kai/calibration
+cd calibration
 ```
 
 Install dependencies and the package:
